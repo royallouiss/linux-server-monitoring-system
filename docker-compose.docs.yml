@@ -1,0 +1,17 @@
+services:
+  docs:
+    image: linux_server_monitoring_system_local_docs
+    container_name: linux_server_monitoring_system_local_docs
+    build:
+      context: .
+      dockerfile: ./compose/local/docs/Dockerfile
+    env_file:
+      - ./.envs/.local/.django
+    volumes:
+      - /app/.venv
+      - ./docs:/docs:z
+      - ./config:/app/config:z
+      - ./linux_server_monitoring_system:/app/linux_server_monitoring_system:z
+    ports:
+      - '9000:9000'
+    command: /start-docs
