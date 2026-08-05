@@ -103,6 +103,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     "linux_server_monitoring_system.users",
+    "linux_server_monitoring_system.servers",
     # Your stuff: custom apps go here
 ]
 # https://docs.djangoproject.com/en/dev/ref/settings/#installed-apps
