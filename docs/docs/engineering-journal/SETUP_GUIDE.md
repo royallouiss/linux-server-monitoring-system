@@ -113,3 +113,18 @@ If the following work correctly, the setup is complete.
 - Homepage loads successfully
 - Admin page opens
 - Superuser login works
+
+# Daily Project Starting
+ - open Windows Powershell "ACTIVATING THE SERVER"
+ - do the following commands
+    1. wsl --list --verbose
+    2. wsl -d Ubuntu
+    3. sudo systemctl status ssh
+    4. Password:
+    5. hostname: OUTPUT="YOURLAPID"
+ - Open vscode
+   1. C:\Projects\cd Linux-Monitoring-System\linux_server_monitoring_system
+   2. .venv\Scripts\activate.bat
+   3. python manage.py test_ssh
+
+
