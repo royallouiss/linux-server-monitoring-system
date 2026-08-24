@@ -1,3 +1,5 @@
+from html import parser
+
 from django.core.management.base import BaseCommand
 
 from linux_server_monitoring_system.core.ssh import SSHService
@@ -7,11 +9,21 @@ from linux_server_monitoring_system.servers.models import Server
 class Command(BaseCommand):
     help = "Test SSH connection to a registered server."
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+        "--id",
+        dest="server_id",
+        type=int,
+        required=True,
+        help="ID of the server to test.",
+    )
+
     def handle(self, *args, **options):
         self.stdout.write(self.style.NOTICE("Testing SSH connection..."))
 
         # Get the first registered server
-        server = Server.objects.first()
+        server_id = options["server_id"]
+        server = Server.objects.filter(id=server_id).first()
 
         if not server:
             self.stdout.write(
