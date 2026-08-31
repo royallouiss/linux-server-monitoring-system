@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -138,3 +139,57 @@ class MonitoringServiceTests(TestCase):
             MetricSample.objects.filter(server=server).count(),
             0,
         )
+    @patch(
+    "linux_server_monitoring_system.monitoring.services.monitoring.SSHService"
+     )
+    def test_creates_service_for_server(self, mock_ssh_service):
+        server = Server.objects.create(
+            server_name="SAN Ubuntu",
+            hostname="192.168.1.8",
+            ssh_port=22,
+            username="sandra",
+            password="test-password",
+        )
+
+        mock_ssh_service.return_value.connect.return_value = (
+            True,
+            "Connection successful.",
+        )
+
+        service = MonitoringService.for_server(server)
+
+        self.assertEqual(service.server, server)
+        self.assertIsNotNone(service.cpu_collector)
+        self.assertIsNotNone(service.memory_collector)
+
+        mock_ssh_service.return_value.connect.assert_called_once_with(
+            hostname="192.168.1.8",
+            port=22,
+            username="sandra",
+            password="test-password",
+        )
+    @patch(
+        "linux_server_monitoring_system.monitoring.services.monitoring.SSHService"
+    )
+    def test_for_server_raises_when_ssh_connection_fails(
+        self,
+        mock_ssh_service,
+       ):
+        server = Server.objects.create(
+            server_name="SAN Ubuntu",
+            hostname="192.168.1.8",
+            ssh_port=22,
+            username="sandra",
+            password="test-password",
+        )
+
+        mock_ssh_service.return_value.connect.return_value = (
+            False,
+            "Authentication failed.",
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Authentication failed.",
+        ):
+            MonitoringService.for_server(server)    

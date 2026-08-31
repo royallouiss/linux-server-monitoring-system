@@ -1,3 +1,6 @@
+from linux_server_monitoring_system.core.ssh import SSHService
+from linux_server_monitoring_system.monitoring.collectors.cpu import CPUCollector
+from linux_server_monitoring_system.monitoring.collectors.memory import MemoryCollector
 from decimal import Decimal
 
 from django.db import transaction
@@ -105,3 +108,22 @@ class MonitoringService:
                 ),
             ]
         )
+    @classmethod
+    def for_server(cls, server):
+        ssh = SSHService()
+
+        success, message = ssh.connect(
+            hostname=server.hostname,
+            port=server.ssh_port,
+            username=server.username,
+            password=server.password,
+        )
+
+        if not success:
+            raise RuntimeError(message)
+
+        return cls(
+            server=server,
+            cpu_collector=CPUCollector(ssh),
+            memory_collector=MemoryCollector(ssh),
+        )    
