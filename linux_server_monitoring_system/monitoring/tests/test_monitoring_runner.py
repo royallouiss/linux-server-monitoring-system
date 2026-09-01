@@ -1,0 +1,81 @@
+from unittest.mock import patch
+
+from django.test import SimpleTestCase
+
+
+class MonitoringRunnerTests(SimpleTestCase):
+    @patch(
+        "linux_server_monitoring_system.monitoring.runners.monitoring.MonitoringJob"
+    )
+    def test_runs_monitoring_for_each_active_server(
+        self,
+        mock_monitoring_job,
+    ):
+        from linux_server_monitoring_system.monitoring.runners.monitoring import (
+            MonitoringRunner,
+        )
+
+        server_1 = object()
+        server_2 = object()
+
+        servers = [server_1, server_2]
+
+        MonitoringRunner.run(servers)
+
+        self.assertEqual(
+            mock_monitoring_job.run.call_count,
+            2,
+        )
+
+        mock_monitoring_job.run.assert_any_call(server_1)
+        mock_monitoring_job.run.assert_any_call(server_2)
+
+    @patch(
+        "linux_server_monitoring_system.monitoring.runners.monitoring.MonitoringJob"
+    )
+    def test_continues_when_one_server_fails(
+        self,
+        mock_monitoring_job,
+    ):
+        server_1 = object()
+        server_2 = object()
+        server_3 = object()
+
+        mock_monitoring_job.run.side_effect = [
+            None,
+            RuntimeError("SSH connection failed."),
+            None,
+        ]
+
+        from linux_server_monitoring_system.monitoring.runners.monitoring import (
+            MonitoringRunner,
+        )
+
+        result = MonitoringRunner.run(
+            [server_1, server_2, server_3]
+        )
+
+        self.assertEqual(
+            result["successful"],
+            [server_1, server_3],
+        )
+
+        self.assertEqual(
+            len(result["failed"]),
+            1,
+        )
+
+        self.assertIs(
+            result["failed"][0]["server"],
+            server_2,
+        )
+
+        self.assertEqual(
+            result["failed"][0]["error"],
+            "SSH connection failed.",
+        )
+
+        self.assertEqual(
+            mock_monitoring_job.run.call_count,
+            3,
+        )
