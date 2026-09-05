@@ -127,4 +127,12 @@ If the following work correctly, the setup is complete.
    2. .venv\Scripts\activate.bat
    3. python manage.py test_ssh
 
+# Updating ip in Stored DB
+ #DO
+  1. python manage.py shell
+  2. from linux_server_monitoring_system.servers.models import Server
+   server = Server.objects.get(server_name="NAME OF PC")
+   server.hostname = "192.168.1.2" <-- TYPE IP NEEDED TO BE UPDATED
+   server.save()
+  3. Server.objects.get(server_name="NAME OF PC").hostname VERIFY
 
