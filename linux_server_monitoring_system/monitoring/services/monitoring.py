@@ -1,11 +1,12 @@
-from linux_server_monitoring_system.core.ssh import SSHService
-from linux_server_monitoring_system.monitoring.collectors.cpu import CPUCollector
-from linux_server_monitoring_system.monitoring.collectors.memory import MemoryCollector
 from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
 
+from linux_server_monitoring_system.core.ssh import SSHService
+from linux_server_monitoring_system.monitoring.collectors.cpu import CPUCollector
+from linux_server_monitoring_system.monitoring.collectors.disk import DiskCollector
+from linux_server_monitoring_system.monitoring.collectors.memory import MemoryCollector
 from linux_server_monitoring_system.monitoring.models import MetricSample
 
 
@@ -15,10 +16,12 @@ class MonitoringService:
         server,
         cpu_collector,
         memory_collector,
+        disk_collector,
     ):
         self.server = server
         self.cpu_collector = cpu_collector
         self.memory_collector = memory_collector
+        self.disk_collector = disk_collector
 
     @transaction.atomic
     def collect(self, timestamp=None):
@@ -27,6 +30,7 @@ class MonitoringService:
 
         cpu_metrics = self.cpu_collector.collect()
         memory_metrics = self.memory_collector.collect()
+        disk_metrics = self.disk_collector.collect()
 
         self._store_cpu_metrics(
             cpu_metrics,
@@ -35,6 +39,11 @@ class MonitoringService:
 
         self._store_memory_metrics(
             memory_metrics,
+            timestamp,
+        )
+
+        self._store_disk_metrics(
+            disk_metrics,
             timestamp,
         )
 
@@ -108,6 +117,39 @@ class MonitoringService:
                 ),
             ]
         )
+
+    def _store_disk_metrics(self, metrics, timestamp):
+        samples = []
+
+        for mount_point, disk in metrics.items():
+            samples.extend(
+                [
+                    MetricSample(
+                        server=self.server,
+                        metric_name=f"disk_used:{mount_point}",
+                        value=Decimal(str(disk["used_bytes"])),
+                        unit="bytes",
+                        timestamp=timestamp,
+                    ),
+                    MetricSample(
+                        server=self.server,
+                        metric_name=f"disk_available:{mount_point}",
+                        value=Decimal(str(disk["available_bytes"])),
+                        unit="bytes",
+                        timestamp=timestamp,
+                    ),
+                    MetricSample(
+                        server=self.server,
+                        metric_name=f"disk_usage:{mount_point}",
+                        value=Decimal(str(disk["usage_percent"])),
+                        unit="percent",
+                        timestamp=timestamp,
+                    ),
+                ]
+            )
+
+        MetricSample.objects.bulk_create(samples)
+
     @classmethod
     def for_server(cls, server):
         ssh = SSHService()
@@ -126,4 +168,5 @@ class MonitoringService:
             server=server,
             cpu_collector=CPUCollector(ssh),
             memory_collector=MemoryCollector(ssh),
-        )    
+            disk_collector=DiskCollector(ssh),
+        )

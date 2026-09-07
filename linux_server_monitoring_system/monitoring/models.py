@@ -11,7 +11,7 @@ class MetricSample(models.Model):
     )
 
     metric_name = models.CharField(
-        max_length=50,
+        max_length=255,
     )
 
     value = models.DecimalField(
