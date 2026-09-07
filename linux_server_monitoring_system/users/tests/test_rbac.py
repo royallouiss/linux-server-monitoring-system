@@ -197,3 +197,41 @@ class TestViewMixinsAndDecorators:
         request.user = self.viewer_user
         view_denied = DummyView(request)
         assert view_denied.test_func() is False
+
+
+@pytest.mark.django_db
+class TestGranularCapabilities:
+    def setup_method(self):
+        self.admin = User.objects.create(
+            email="cap_admin@example.com",
+            role=User.Role.ADMIN,
+        )
+        self.viewer = User.objects.create(
+            email="cap_viewer@example.com",
+            role=User.Role.VIEWER,
+        )
+
+    def test_admin_capabilities(self):
+        """Admin has full privileges across all operations."""
+        assert self.admin.can_add_server is True
+        assert self.admin.can_edit_server is True
+        assert self.admin.can_delete_server is True
+        assert self.admin.can_configure_alerts is True
+        assert self.admin.can_view_monitoring is True
+        assert self.admin.can_view_dashboard is True
+        assert self.admin.can_view_metrics is True
+        assert self.admin.can_view_alerts is True
+
+    def test_viewer_capabilities(self):
+        """Viewer has read-only access to dashboard, metrics, and alerts."""
+        assert self.viewer.can_view_dashboard is True
+        assert self.viewer.can_view_metrics is True
+        assert self.viewer.can_view_alerts is True
+        assert self.viewer.can_view_monitoring is True
+
+        # Viewer CANNOT perform admin actions
+        assert self.viewer.can_add_server is False
+        assert self.viewer.can_edit_server is False
+        assert self.viewer.can_delete_server is False
+        assert self.viewer.can_configure_alerts is False
+

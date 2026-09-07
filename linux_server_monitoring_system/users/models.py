@@ -58,6 +58,47 @@ class User(AbstractUser):
         """Viewer has read-only access (view dashboard, metrics, alerts)."""
         return True
 
+    # Granular capability checks for Admin, Operator, and Viewer
+    @property
+    def can_add_server(self) -> bool:
+        """Allow adding servers (Admin & Operator)."""
+        return self.is_operator_role
+
+    @property
+    def can_edit_server(self) -> bool:
+        """Allow editing servers (Admin & Operator)."""
+        return self.is_operator_role
+
+    @property
+    def can_delete_server(self) -> bool:
+        """Allow deleting servers (Admin only)."""
+        return self.is_admin_role
+
+    @property
+    def can_configure_alerts(self) -> bool:
+        """Allow configuring alert thresholds (Admin only)."""
+        return self.is_admin_role
+
+    @property
+    def can_view_monitoring(self) -> bool:
+        """Allow viewing monitoring metrics (Admin, Operator, Viewer)."""
+        return self.is_viewer_role
+
+    @property
+    def can_view_dashboard(self) -> bool:
+        """Allow viewing dashboard overview (Admin, Operator, Viewer)."""
+        return self.is_viewer_role
+
+    @property
+    def can_view_metrics(self) -> bool:
+        """Allow viewing performance metrics (Admin, Operator, Viewer)."""
+        return self.is_viewer_role
+
+    @property
+    def can_view_alerts(self) -> bool:
+        """Allow viewing triggered alerts (Admin, Operator, Viewer)."""
+        return self.is_viewer_role
+
     def has_role_permission(self, required_role: str) -> bool:
         """Check if user role meets or exceeds the required privilege level."""
         if self.is_superuser:
