@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from allauth.account.models import EmailAddress
 from django.contrib.auth.models import Group
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
@@ -70,6 +71,13 @@ class Command(BaseCommand):
             group = Group.objects.filter(name=user_data["group_name"]).first()
             if group:
                 user.groups.add(group)
+
+            # Ensure email is verified in allauth
+            EmailAddress.objects.get_or_create(
+                user=user,
+                email=user.email,
+                defaults={"verified": True, "primary": True},
+            )
 
             action_label = "Created" if created else "Updated"
             name = user_data["name"]
