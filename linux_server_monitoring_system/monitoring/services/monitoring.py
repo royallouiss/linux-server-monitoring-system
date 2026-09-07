@@ -7,6 +7,7 @@ from linux_server_monitoring_system.core.ssh import SSHService
 from linux_server_monitoring_system.monitoring.collectors.cpu import CPUCollector
 from linux_server_monitoring_system.monitoring.collectors.disk import DiskCollector
 from linux_server_monitoring_system.monitoring.collectors.memory import MemoryCollector
+from linux_server_monitoring_system.monitoring.collectors.network import NetworkCollector
 from linux_server_monitoring_system.monitoring.models import MetricSample
 
 
@@ -17,11 +18,13 @@ class MonitoringService:
         cpu_collector,
         memory_collector,
         disk_collector,
+        network_collector,
     ):
         self.server = server
         self.cpu_collector = cpu_collector
         self.memory_collector = memory_collector
         self.disk_collector = disk_collector
+        self.network_collector = network_collector
 
     @transaction.atomic
     def collect(self, timestamp=None):
@@ -31,21 +34,12 @@ class MonitoringService:
         cpu_metrics = self.cpu_collector.collect()
         memory_metrics = self.memory_collector.collect()
         disk_metrics = self.disk_collector.collect()
+        network_metrics = self.network_collector.collect()
 
-        self._store_cpu_metrics(
-            cpu_metrics,
-            timestamp,
-        )
-
-        self._store_memory_metrics(
-            memory_metrics,
-            timestamp,
-        )
-
-        self._store_disk_metrics(
-            disk_metrics,
-            timestamp,
-        )
+        self._store_cpu_metrics(cpu_metrics, timestamp)
+        self._store_memory_metrics(memory_metrics, timestamp)
+        self._store_disk_metrics(disk_metrics, timestamp)
+        self._store_network_metrics(network_metrics, timestamp)
 
     def _store_cpu_metrics(self, metrics, timestamp):
         MetricSample.objects.bulk_create(
@@ -150,6 +144,53 @@ class MonitoringService:
 
         MetricSample.objects.bulk_create(samples)
 
+    def _store_network_metrics(self, metrics, timestamp):
+        samples = []
+
+        for interface, network in metrics.items():
+            samples.extend(
+                [
+                    MetricSample(
+                        server=self.server,
+                        metric_name=f"network_received_bytes:{interface}",
+                        value=Decimal(
+                            str(network["received_bytes"])
+                        ),
+                        unit="bytes",
+                        timestamp=timestamp,
+                    ),
+                    MetricSample(
+                        server=self.server,
+                        metric_name=f"network_transmitted_bytes:{interface}",
+                        value=Decimal(
+                            str(network["transmitted_bytes"])
+                        ),
+                        unit="bytes",
+                        timestamp=timestamp,
+                    ),
+                    MetricSample(
+                        server=self.server,
+                        metric_name=f"network_receive_rate:{interface}",
+                        value=Decimal(
+                            str(network["receive_rate"])
+                        ),
+                        unit="bytes_per_second",
+                        timestamp=timestamp,
+                    ),
+                    MetricSample(
+                        server=self.server,
+                        metric_name=f"network_transmit_rate:{interface}",
+                        value=Decimal(
+                            str(network["transmit_rate"])
+                        ),
+                        unit="bytes_per_second",
+                        timestamp=timestamp,
+                    ),
+                ]
+            )
+
+        MetricSample.objects.bulk_create(samples)
+
     @classmethod
     def for_server(cls, server):
         ssh = SSHService()
@@ -169,4 +210,5 @@ class MonitoringService:
             cpu_collector=CPUCollector(ssh),
             memory_collector=MemoryCollector(ssh),
             disk_collector=DiskCollector(ssh),
+            network_collector=NetworkCollector(ssh),
         )

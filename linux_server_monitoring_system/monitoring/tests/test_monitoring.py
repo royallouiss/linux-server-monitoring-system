@@ -62,6 +62,17 @@ class MonitoringServiceTests(TestCase):
                     },
                 }
 
+        class FakeNetworkCollector:
+            def collect(self):
+                return {
+                    "eth0": {
+                        "received_bytes": 1000000,
+                        "transmitted_bytes": 2000000,
+                        "receive_rate": 500000.0,
+                        "transmit_rate": 200000.0,
+                    },
+                }
+
         timestamp = timezone.make_aware(
             datetime(2026, 8, 31, 9, 45, 0)
         )
@@ -71,6 +82,7 @@ class MonitoringServiceTests(TestCase):
             cpu_collector=FakeCPUCollector(),
             memory_collector=FakeMemoryCollector(),
             disk_collector=FakeDiskCollector(),
+            network_collector=FakeNetworkCollector(),
         )
 
         service.collect(timestamp=timestamp)
@@ -79,7 +91,7 @@ class MonitoringServiceTests(TestCase):
             server=server,
         ).order_by("metric_name")
 
-        self.assertEqual(samples.count(), 11)
+        self.assertEqual(samples.count(), 15)
 
         # CPU metrics
 
@@ -166,6 +178,51 @@ class MonitoringServiceTests(TestCase):
         )
         self.assertEqual(root_usage.unit, "percent")
 
+        # Network metrics
+
+        network_received = samples.get(
+            metric_name="network_received_bytes:eth0"
+        )
+        self.assertEqual(
+            network_received.value,
+            Decimal("1000000"),
+        )
+        self.assertEqual(network_received.unit, "bytes")
+        self.assertEqual(network_received.timestamp, timestamp)
+
+        network_transmitted = samples.get(
+            metric_name="network_transmitted_bytes:eth0"
+        )
+        self.assertEqual(
+            network_transmitted.value,
+            Decimal("2000000"),
+        )
+        self.assertEqual(network_transmitted.unit, "bytes")
+
+        network_receive_rate = samples.get(
+            metric_name="network_receive_rate:eth0"
+        )
+        self.assertEqual(
+            network_receive_rate.value,
+            Decimal("500000.0"),
+        )
+        self.assertEqual(
+            network_receive_rate.unit,
+            "bytes_per_second",
+        )
+
+        network_transmit_rate = samples.get(
+            metric_name="network_transmit_rate:eth0"
+        )
+        self.assertEqual(
+            network_transmit_rate.value,
+            Decimal("200000.0"),
+        )
+        self.assertEqual(
+            network_transmit_rate.unit,
+            "bytes_per_second",
+        )
+
     def test_collect_rolls_back_when_storage_fails(self):
         server = Server.objects.create(
             server_name="SAN Ubuntu",
@@ -202,11 +259,23 @@ class MonitoringServiceTests(TestCase):
                     },
                 }
 
+        class FakeNetworkCollector:
+            def collect(self):
+                return {
+                    "eth0": {
+                        "received_bytes": 1000000,
+                        "transmitted_bytes": 2000000,
+                        "receive_rate": 500000.0,
+                        "transmit_rate": 200000.0,
+                    },
+                }
+
         service = MonitoringService(
             server=server,
             cpu_collector=FakeCPUCollector(),
             memory_collector=FailingMemoryCollector(),
             disk_collector=FakeDiskCollector(),
+            network_collector=FakeNetworkCollector(),
         )
 
         with self.assertRaises(RuntimeError):
@@ -240,6 +309,7 @@ class MonitoringServiceTests(TestCase):
         self.assertIsNotNone(service.cpu_collector)
         self.assertIsNotNone(service.memory_collector)
         self.assertIsNotNone(service.disk_collector)
+        self.assertIsNotNone(service.network_collector)
 
         mock_ssh_service.return_value.connect.assert_called_once_with(
             hostname="192.168.1.8",
