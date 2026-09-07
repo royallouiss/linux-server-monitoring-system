@@ -47,3 +47,38 @@ class MonitoringSchedulerTests(SimpleTestCase):
                 "failed": [],
             },
         )
+
+    @patch(
+        "linux_server_monitoring_system.monitoring.schedulers.monitoring.MonitoringRunner"
+    )
+    def test_runs_with_no_active_servers(
+        self,
+        mock_monitoring_runner,
+    ):
+        mock_monitoring_runner.run.return_value = {
+            "successful": [],
+            "failed": [],
+        }
+
+        with patch(
+            "linux_server_monitoring_system.monitoring.schedulers.monitoring.Server"
+        ) as mock_server:
+            mock_server.objects.filter.return_value = []
+
+            result = MonitoringScheduler.run()
+
+        mock_server.objects.filter.assert_called_once_with(
+            is_active=True,
+        )
+
+        mock_monitoring_runner.run.assert_called_once_with(
+            [],
+        )
+
+        self.assertEqual(
+            result,
+            {
+                "successful": [],
+                "failed": [],
+            },
+        )

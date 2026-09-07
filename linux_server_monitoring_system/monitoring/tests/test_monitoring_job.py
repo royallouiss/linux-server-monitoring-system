@@ -24,3 +24,21 @@ class MonitoringJobTests(SimpleTestCase):
         )
 
         service.collect.assert_called_once_with()
+    @patch(
+        "linux_server_monitoring_system.monitoring.jobs.monitoring.MonitoringService"
+    )
+    def test_propagates_monitoring_service_failure(
+        self,
+        mock_monitoring_service,
+    ):
+        server = Mock()
+
+        mock_monitoring_service.for_server.side_effect = RuntimeError(
+            "Monitoring failed."
+        )
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "Monitoring failed.",
+        ):
+            MonitoringJob.run(server)

@@ -79,3 +79,26 @@ class MonitoringRunnerTests(SimpleTestCase):
             mock_monitoring_job.run.call_count,
             3,
         )
+
+    @patch(
+        "linux_server_monitoring_system.monitoring.runners.monitoring.MonitoringJob"
+    )
+    def test_returns_empty_result_when_no_servers(
+        self,
+        mock_monitoring_job,
+    ):
+        from linux_server_monitoring_system.monitoring.runners.monitoring import (
+            MonitoringRunner,
+        )
+
+        result = MonitoringRunner.run([])
+
+        self.assertEqual(
+            result,
+            {
+                "successful": [],
+                "failed": [],
+            },
+        )
+
+        mock_monitoring_job.run.assert_not_called()
