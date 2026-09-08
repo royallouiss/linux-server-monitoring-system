@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 
@@ -17,18 +17,36 @@ class MonitoringRunnerTests(SimpleTestCase):
 
         server_1 = object()
         server_2 = object()
+        server_3 = object()
 
-        servers = [server_1, server_2]
+        servers = [
+            server_1,
+            server_2,
+            server_3,
+        ]
 
-        MonitoringRunner.run(servers)
+        result = MonitoringRunner.run(servers)
+
+        self.assertEqual(
+            result,
+            {
+                "successful": [
+                    server_1,
+                    server_2,
+                    server_3,
+                ],
+                "failed": [],
+            },
+        )
 
         self.assertEqual(
             mock_monitoring_job.run.call_count,
-            2,
+            3,
         )
 
         mock_monitoring_job.run.assert_any_call(server_1)
         mock_monitoring_job.run.assert_any_call(server_2)
+        mock_monitoring_job.run.assert_any_call(server_3)
 
     @patch(
         "linux_server_monitoring_system.monitoring.runners.monitoring.MonitoringJob"
@@ -37,8 +55,13 @@ class MonitoringRunnerTests(SimpleTestCase):
         self,
         mock_monitoring_job,
     ):
+        from linux_server_monitoring_system.monitoring.runners.monitoring import (
+            MonitoringRunner,
+        )
+
         server_1 = object()
-        server_2 = object()
+        server_2 = Mock()
+        server_2.server_name = "Server 2"
         server_3 = object()
 
         mock_monitoring_job.run.side_effect = [
@@ -47,17 +70,20 @@ class MonitoringRunnerTests(SimpleTestCase):
             None,
         ]
 
-        from linux_server_monitoring_system.monitoring.runners.monitoring import (
-            MonitoringRunner,
-        )
-
         result = MonitoringRunner.run(
-            [server_1, server_2, server_3]
+            [
+                server_1,
+                server_2,
+                server_3,
+            ]
         )
 
         self.assertEqual(
             result["successful"],
-            [server_1, server_3],
+            [
+                server_1,
+                server_3,
+            ],
         )
 
         self.assertEqual(
