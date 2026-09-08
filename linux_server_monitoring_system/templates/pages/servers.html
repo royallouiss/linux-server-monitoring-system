@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}Server Fleet — Linux Server Monitoring{% endblock title %}
+
+{% block content %}
+<div class="container-fluid py-2">
+  <!-- Scaffolding Banner -->
+  <div class="scaffold-banner d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div>
+      <i class="bi bi-info-circle-fill me-2 text-info"></i>
+      <strong>Member 4 Template Scaffolding:</strong> This interface is prepared for <strong>Member 2 & Team Lead (Server Management & SSH Telemetry)</strong>.
+      Authentication & RBAC security layers are active.
+    </div>
+    <div>
+      {% if request.user.is_authenticated %}
+        <span class="badge bg-secondary">Current Role: {{ request.user.get_role_display }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Page Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <div>
+      <h2 class="h4 text-white fw-bold mb-1">
+        <i class="bi bi-hdd-network-fill text-primary me-2"></i>Managed Linux Servers
+      </h2>
+      <p class="text-muted small mb-0">Real-time agentless telemetry collected via secure SSH protocol</p>
+    </div>
+    <div class="d-flex gap-2">
+      {% if request.user.can_add_server %}
+        <button class="spark-btn-primary" type="button" data-bs-toggle="tooltip" title="Available for Admin & Operator">
+          <i class="bi bi-plus-lg me-1"></i>Add New Server
+        </button>
+      {% else %}
+        <button class="spark-btn-secondary opacity-50" disabled title="Requires Operator or Admin role">
+          <i class="bi bi-lock-fill me-1"></i>Add Server (Restricted)
+        </button>
+      {% endif %}
+      <a href="{% url 'home' %}" class="spark-btn-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Overview
+      </a>
+    </div>
+  </div>
+
+  <!-- Top Metric Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="spark-card">
+        <div class="spark-card-body">
+          <div class="stat-widget">
+            <div class="stat-icon stat-icon-blue">
+              <i class="bi bi-server"></i>
+            </div>
+            <div>
+              <div class="stat-title">Total Nodes</div>
+              <div class="stat-value">3</div>
+              <div class="stat-subtitle text-success"><i class="bi bi-check-circle-fill me-1"></i>All Active</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="spark-card">
+        <div class="spark-card-body">
+          <div class="stat-widget">
+            <div class="stat-icon stat-icon-green">
+              <i class="bi bi-shield-check"></i>
+            </div>
+            <div>
+              <div class="stat-title">SSH Health</div>
+              <div class="stat-value">100%</div>
+              <div class="stat-subtitle text-muted">Key Auth Validated</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="spark-card">
+        <div class="spark-card-body">
+          <div class="stat-widget">
+            <div class="stat-icon stat-icon-purple">
+              <i class="bi bi-cpu"></i>
+            </div>
+            <div>
+              <div class="stat-title">Fleet Avg CPU</div>
+              <div class="stat-value">34.2%</div>
+              <div class="stat-subtitle text-muted">Across 3 instances</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="spark-card">
+        <div class="spark-card-body">
+          <div class="stat-widget">
+            <div class="stat-icon stat-icon-amber">
+              <i class="bi bi-bell-fill"></i>
+            </div>
+            <div>
+              <div class="stat-title">Pending Alerts</div>
+              <div class="stat-value">0</div>
+              <div class="stat-subtitle text-success">Healthy Thresholds</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Server Fleet Grid (Mock Cards) -->
+  <div class="row g-4">
+    <!-- Server 1 -->
+    <div class="col-lg-4 col-md-6">
+      <div class="spark-card h-100">
+        <div class="spark-card-header">
+          <div class="d-flex align-items-center gap-2">
+            <span class="pulse-indicator"></span>
+            <span class="text-white fw-semibold">web-prod-01</span>
+          </div>
+          <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">ONLINE</span>
+        </div>
+        <div class="spark-card-body">
+          <p class="text-muted small mb-3"><i class="bi bi-globe me-1"></i>IP: 192.168.1.10 &bull; Ubuntu 22.04 LTS</p>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>CPU Usage</span>
+              <span class="text-white fw-bold">28.4%</span>
+            </div>
+            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-primary" role="progressbar" style="width: 28.4%;"></div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>Memory Usage</span>
+              <span class="text-white fw-bold">42.1%</span>
+            </div>
+            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-info" role="progressbar" style="width: 42.1%;"></div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>Disk Usage</span>
+              <span class="text-white fw-bold">58.0%</span>
+            </div>
+            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-warning" role="progressbar" style="width: 58.0%;"></div>
+            </div>
+          </div>
+
+          <hr style="border-color: var(--spark-border);">
+
+          <div class="d-flex justify-content-between align-items-center pt-1">
+            <span class="text-muted small"><i class="bi bi-clock-history me-1"></i>Uptime: 14d 6h</span>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary btn-sm" title="View Metrics"><i class="bi bi-graph-up"></i></button>
+              {% if request.user.can_edit_server %}
+                <button class="btn btn-outline-secondary btn-sm" title="Edit Server Config"><i class="bi bi-pencil"></i></button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server 2 -->
+    <div class="col-lg-4 col-md-6">
+      <div class="spark-card h-100">
+        <div class="spark-card-header">
+          <div class="d-flex align-items-center gap-2">
+            <span class="pulse-indicator"></span>
+            <span class="text-white fw-semibold">db-master-01</span>
+          </div>
+          <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">ONLINE</span>
+        </div>
+        <div class="spark-card-body">
+          <p class="text-muted small mb-3"><i class="bi bi-database me-1"></i>IP: 192.168.1.20 &bull; Debian 12 (Bookworm)</p>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>CPU Usage</span>
+              <span class="text-white fw-bold">52.8%</span>
+            </div>
+            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-primary" role="progressbar" style="width: 52.8%;"></div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>Memory Usage</span>
+              <span class="text-white fw-bold">68.3%</span>
+            </div>
+            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-info" role="progressbar" style="width: 68.3%;"></div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>Disk Usage</span>
+              <span class="text-white fw-bold">71.2%</span>
+            </div>
+            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-warning" role="progressbar" style="width: 71.2%;"></div>
+            </div>
+          </div>
+
+          <hr style="border-color: var(--spark-border);">
+
+          <div class="d-flex justify-content-between align-items-center pt-1">
+            <span class="text-muted small"><i class="bi bi-clock-history me-1"></i>Uptime: 45d 12h</span>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary btn-sm" title="View Metrics"><i class="bi bi-graph-up"></i></button>
+              {% if request.user.can_edit_server %}
+                <button class="btn btn-outline-secondary btn-sm" title="Edit Server Config"><i class="bi bi-pencil"></i></button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Server 3 -->
+    <div class="col-lg-4 col-md-6">
+      <div class="spark-card h-100">
+        <div class="spark-card-header">
+          <div class="d-flex align-items-center gap-2">
+            <span class="pulse-indicator"></span>
+            <span class="text-white fw-semibold">cache-redis-01</span>
+          </div>
+          <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">ONLINE</span>
+        </div>
+        <div class="spark-card-body">
+          <p class="text-muted small mb-3"><i class="bi bi-lightning-charge me-1"></i>IP: 192.168.1.30 &bull; Ubuntu 22.04 LTS</p>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>CPU Usage</span>
+              <span class="text-white fw-bold">12.1%</span>
+            </div>
+            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-primary" role="progressbar" style="width: 12.1%;"></div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>Memory Usage</span>
+              <span class="text-white fw-bold">29.5%</span>
+            </div>
+            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-info" role="progressbar" style="width: 29.5%;"></div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <div class="d-flex justify-content-between small text-muted mb-1">
+              <span>Disk Usage</span>
+              <span class="text-white fw-bold">22.4%</span>
+            </div>
+            <div class="progress" style="height: 6px; background-color: rgba(255,255,255,0.06);">
+              <div class="progress-bar bg-success" role="progressbar" style="width: 22.4%;"></div>
+            </div>
+          </div>
+
+          <hr style="border-color: var(--spark-border);">
+
+          <div class="d-flex justify-content-between align-items-center pt-1">
+            <span class="text-muted small"><i class="bi bi-clock-history me-1"></i>Uptime: 8d 3h</span>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary btn-sm" title="View Metrics"><i class="bi bi-graph-up"></i></button>
+              {% if request.user.can_edit_server %}
+                <button class="btn btn-outline-secondary btn-sm" title="Edit Server Config"><i class="bi bi-pencil"></i></button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

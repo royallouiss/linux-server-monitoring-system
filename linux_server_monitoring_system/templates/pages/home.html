@@ -1,3 +1,470 @@
 {% extends "base.html" %}
+{% load i18n static %}
 
+{% block title %}
+  {% if request.user.is_authenticated %}
+    Infrastructure Command Center — Linux Server Monitoring
+  {% else %}
+    Linux Server Monitoring & Management System
+  {% endif %}
+{% endblock title %}
 
+{% block content %}
+{% if request.user.is_authenticated %}
+  <!-- ========================================================================
+       AUTHENTICATED DASHBOARD (Spark Admin Command Center)
+       ======================================================================== -->
+  <div class="container-fluid py-2">
+    <!-- Welcome Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+      <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <h2 class="h4 text-white fw-bold mb-0">Infrastructure Command Center</h2>
+          <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">
+            <span class="pulse-indicator me-1"></span>LIVE TELEMETRY
+          </span>
+        </div>
+        <p class="text-muted small mb-0">
+          Welcome back, <strong class="text-white">{{ request.user.email }}</strong> &bull; Authenticated as
+          <span class="text-info fw-semibold">{{ request.user.get_role_display }}</span>
+        </p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{% url 'servers_scaffold' %}" class="spark-btn-primary">
+          <i class="bi bi-server me-1"></i>View Server Fleet
+        </a>
+        <a href="{% url 'alerts_scaffold' %}" class="spark-btn-secondary">
+          <i class="bi bi-bell me-1"></i>Alert Rules
+        </a>
+        {% if request.user.is_admin_role %}
+          <a href="{% url 'admin:index' %}" class="spark-btn-secondary" target="_blank">
+            <i class="bi bi-shield-lock me-1"></i>Django Admin
+          </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Top Metric Widgets -->
+    <div class="row g-3 mb-4">
+      <div class="col-lg-3 col-md-6">
+        <div class="spark-card">
+          <div class="spark-card-body">
+            <div class="stat-widget">
+              <div class="stat-icon stat-icon-blue">
+                <i class="bi bi-hdd-network"></i>
+              </div>
+              <div>
+                <div class="stat-title">Managed Nodes</div>
+                <div class="stat-value">3 Online</div>
+                <div class="stat-subtitle text-success"><i class="bi bi-arrow-up-right me-1"></i>100% Operational</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="spark-card">
+          <div class="spark-card-body">
+            <div class="stat-widget">
+              <div class="stat-icon stat-icon-purple">
+                <i class="bi bi-cpu"></i>
+              </div>
+              <div>
+                <div class="stat-title">Fleet CPU Avg</div>
+                <div class="stat-value">34.2%</div>
+                <div class="stat-subtitle text-muted">Across all instances</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="spark-card">
+          <div class="spark-card-body">
+            <div class="stat-widget">
+              <div class="stat-icon stat-icon-amber">
+                <i class="bi bi-exclamation-octagon"></i>
+              </div>
+              <div>
+                <div class="stat-title">Active Alerts</div>
+                <div class="stat-value">0 Breach</div>
+                <div class="stat-subtitle text-success"><i class="bi bi-shield-check me-1"></i>All Rules Nominal</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-6">
+        <div class="spark-card">
+          <div class="spark-card-body">
+            <div class="stat-widget">
+              <div class="stat-icon stat-icon-green">
+                <i class="bi bi-person-badge"></i>
+              </div>
+              <div>
+                <div class="stat-title">Your RBAC Tier</div>
+                <div class="stat-value">
+                  {% if request.user.is_admin_role %}
+                    <span class="text-danger">Admin</span>
+                  {% elif request.user.is_operator_role %}
+                    <span class="text-primary">Operator</span>
+                  {% else %}
+                    <span class="text-success">Viewer</span>
+                  {% endif %}
+                </div>
+                <div class="stat-subtitle text-muted">Session Verified</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content Split -->
+    <div class="row g-4">
+      <!-- Left Column: Server Status Preview -->
+      <div class="col-lg-8">
+        <div class="spark-card mb-4">
+          <div class="spark-card-header">
+            <span class="text-white fw-semibold">
+              <i class="bi bi-hdd-stack me-2 text-primary"></i>Server Fleet Telemetry Stream
+            </span>
+            <a href="{% url 'servers_scaffold' %}" class="small text-decoration-none text-primary">Full Fleet &rarr;</a>
+          </div>
+          <div class="spark-card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-dark-spark mb-0">
+                <thead>
+                  <tr>
+                    <th>Host / Node</th>
+                    <th>IP Address</th>
+                    <th>CPU Load</th>
+                    <th>RAM Usage</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="pulse-indicator"></span>
+                        <strong class="text-white">web-prod-01</strong>
+                      </div>
+                    </td>
+                    <td><code>192.168.1.10</code></td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height: 5px; width: 60px; background: rgba(255,255,255,0.06);">
+                          <div class="progress-bar bg-primary" style="width: 28%;"></div>
+                        </div>
+                        <small class="text-white">28%</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height: 5px; width: 60px; background: rgba(255,255,255,0.06);">
+                          <div class="progress-bar bg-info" style="width: 42%;"></div>
+                        </div>
+                        <small class="text-white">42%</small>
+                      </div>
+                    </td>
+                    <td><span class="badge bg-success bg-opacity-25 text-success">HEALTHY</span></td>
+                    <td><a href="{% url 'servers_scaffold' %}" class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-eye"></i></a></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="pulse-indicator"></span>
+                        <strong class="text-white">db-master-01</strong>
+                      </div>
+                    </td>
+                    <td><code>192.168.1.20</code></td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height: 5px; width: 60px; background: rgba(255,255,255,0.06);">
+                          <div class="progress-bar bg-primary" style="width: 53%;"></div>
+                        </div>
+                        <small class="text-white">53%</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height: 5px; width: 60px; background: rgba(255,255,255,0.06);">
+                          <div class="progress-bar bg-warning" style="width: 68%;"></div>
+                        </div>
+                        <small class="text-white">68%</small>
+                      </div>
+                    </td>
+                    <td><span class="badge bg-success bg-opacity-25 text-success">HEALTHY</span></td>
+                    <td><a href="{% url 'servers_scaffold' %}" class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-eye"></i></a></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="pulse-indicator"></span>
+                        <strong class="text-white">cache-redis-01</strong>
+                      </div>
+                    </td>
+                    <td><code>192.168.1.30</code></td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height: 5px; width: 60px; background: rgba(255,255,255,0.06);">
+                          <div class="progress-bar bg-primary" style="width: 12%;"></div>
+                        </div>
+                        <small class="text-white">12%</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height: 5px; width: 60px; background: rgba(255,255,255,0.06);">
+                          <div class="progress-bar bg-info" style="width: 30%;"></div>
+                        </div>
+                        <small class="text-white">30%</small>
+                      </div>
+                    </td>
+                    <td><span class="badge bg-success bg-opacity-25 text-success">HEALTHY</span></td>
+                    <td><a href="{% url 'servers_scaffold' %}" class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-eye"></i></a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Teammate Integration Notice -->
+        <div class="scaffold-banner">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-diagram-3-fill text-primary"></i>
+            <strong class="text-white">Architecture & Integration Matrix (Sprint Progress):</strong>
+          </div>
+          <div class="row g-2 text-white-50 small">
+            <div class="col-md-4">
+              <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Member 4 (You):</span> Auth, RBAC, Scaffolding, DevOps.
+            </div>
+            <div class="col-md-4">
+              <span class="text-info"><i class="bi bi-clock-history me-1"></i>Member 2 & Lead:</span> Server Models & SSH collector.
+            </div>
+            <div class="col-md-4">
+              <span class="text-warning"><i class="bi bi-clock-history me-1"></i>Member 1:</span> Alert Rules & Notification engine.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: RBAC Capabilities Matrix -->
+      <div class="col-lg-4">
+        <div class="spark-card mb-4">
+          <div class="spark-card-header">
+            <span class="text-white fw-semibold">
+              <i class="bi bi-shield-lock-fill me-2 text-primary"></i>Active Permissions
+            </span>
+            <span class="badge bg-secondary bg-opacity-25 text-muted">{{ request.user.role }}</span>
+          </div>
+          <div class="spark-card-body">
+            <p class="text-muted small mb-3">
+              Privileges dynamically evaluated via Member 4 RBAC engine:
+            </p>
+            <ul class="list-unstyled mb-0 d-flex flex-column gap-2 small">
+              <li class="d-flex align-items-center justify-content-between p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                <span><i class="bi bi-plus-circle me-2 text-primary"></i>Add New Servers</span>
+                {% if request.user.can_add_server %}
+                  <span class="badge bg-success bg-opacity-25 text-success">ALLOWED</span>
+                {% else %}
+                  <span class="badge bg-secondary bg-opacity-25 text-muted"><i class="bi bi-lock me-1"></i>LOCKED</span>
+                {% endif %}
+              </li>
+
+              <li class="d-flex align-items-center justify-content-between p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                <span><i class="bi bi-pencil-square me-2 text-primary"></i>Edit / Configure Server</span>
+                {% if request.user.can_edit_server %}
+                  <span class="badge bg-success bg-opacity-25 text-success">ALLOWED</span>
+                {% else %}
+                  <span class="badge bg-secondary bg-opacity-25 text-muted"><i class="bi bi-lock me-1"></i>LOCKED</span>
+                {% endif %}
+              </li>
+
+              <li class="d-flex align-items-center justify-content-between p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                <span><i class="bi bi-trash me-2 text-danger"></i>Delete Server Nodes</span>
+                {% if request.user.can_delete_server %}
+                  <span class="badge bg-success bg-opacity-25 text-success">ALLOWED</span>
+                {% else %}
+                  <span class="badge bg-secondary bg-opacity-25 text-muted"><i class="bi bi-lock me-1"></i>LOCKED</span>
+                {% endif %}
+              </li>
+
+              <li class="d-flex align-items-center justify-content-between p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                <span><i class="bi bi-sliders me-2 text-warning"></i>Configure Alert Thresholds</span>
+                {% if request.user.can_configure_alerts %}
+                  <span class="badge bg-success bg-opacity-25 text-success">ALLOWED</span>
+                {% else %}
+                  <span class="badge bg-secondary bg-opacity-25 text-muted"><i class="bi bi-lock me-1"></i>LOCKED</span>
+                {% endif %}
+              </li>
+
+              <li class="d-flex align-items-center justify-content-between p-2 rounded" style="background: rgba(255,255,255,0.03);">
+                <span><i class="bi bi-eye me-2 text-info"></i>View Metrics & Telemetry</span>
+                {% if request.user.can_view_metrics %}
+                  <span class="badge bg-success bg-opacity-25 text-success">ALLOWED</span>
+                {% else %}
+                  <span class="badge bg-secondary bg-opacity-25 text-muted"><i class="bi bi-lock me-1"></i>LOCKED</span>
+                {% endif %}
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Quick Switch Demo User Tip -->
+        <div class="spark-card">
+          <div class="spark-card-body text-center p-3">
+            <i class="bi bi-lightbulb-fill text-warning fs-4 mb-2 d-block"></i>
+            <h6 class="text-white fw-bold mb-1">Testing Other Roles?</h6>
+            <p class="text-muted small mb-3">Sign out and use the 1-Click Quick Fill buttons on the Sign In page to immediately switch between Admin, Operator, and Viewer roles.</p>
+            <a href="{% url 'account_logout' %}" class="spark-btn-secondary btn-sm w-100">
+              <i class="bi bi-arrow-left-right me-1"></i>Switch User Role
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+{% else %}
+  <!-- ========================================================================
+       GUEST / PUBLIC LANDING HERO (Spark Admin Aesthetic)
+       ======================================================================== -->
+  <div class="container py-5">
+    <!-- Hero Banner -->
+    <div class="text-center py-5">
+      <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill mb-3" style="background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3);">
+        <span class="pulse-indicator"></span>
+        <span class="small fw-semibold text-info">Enterprise Server Telemetry System</span>
+      </div>
+      <h1 class="hero-glow-title mb-3">
+        Centralized Agentless Linux Monitoring & Management
+      </h1>
+      <p class="hero-subtitle mx-auto mb-4">
+        Real-time CPU, Memory, Disk, and SSH health telemetry streaming directly to your browser.
+        Engineered with multi-tier Role-Based Access Control and automated threshold evaluation.
+      </p>
+      <div class="d-flex justify-content-center gap-3 flex-wrap">
+        <a href="{% url 'account_login' %}" class="spark-btn-primary px-4 py-2 fs-6">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Sign In to Dashboard
+        </a>
+        <a href="#demo-accounts" class="spark-btn-secondary px-4 py-2 fs-6">
+          <i class="bi bi-person-badge me-2"></i>View Demo Accounts
+        </a>
+      </div>
+    </div>
+
+    <!-- 3 Pillar Feature Cards -->
+    <div class="row g-4 my-4">
+      <div class="col-md-4">
+        <div class="spark-card h-100">
+          <div class="spark-card-body p-4">
+            <div class="stat-icon stat-icon-blue mb-3">
+              <i class="bi bi-terminal"></i>
+            </div>
+            <h5 class="text-white fw-bold mb-2">Agentless SSH Telemetry</h5>
+            <p class="text-muted small mb-0">
+              Monitors remote Linux servers using standard SSH protocol. No proprietary agents or daemon installations required on client nodes.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="spark-card h-100">
+          <div class="spark-card-body p-4">
+            <div class="stat-icon stat-icon-green mb-3">
+              <i class="bi bi-shield-check"></i>
+            </div>
+            <h5 class="text-white fw-bold mb-2">Role-Based Access Control</h5>
+            <p class="text-muted small mb-0">
+              Three-tiered RBAC hierarchy (Admin, Operator, Viewer) strictly enforcing granular operational capabilities across UI and REST API.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="spark-card h-100">
+          <div class="spark-card-body p-4">
+            <div class="stat-icon stat-icon-amber mb-3">
+              <i class="bi bi-bell"></i>
+            </div>
+            <h5 class="text-white fw-bold mb-2">Automated Alert Pipeline</h5>
+            <p class="text-muted small mb-0">
+              Dynamic threshold evaluation engine continuously assessing server metrics against configurable CPU, Memory, and Disk rules.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Demo Access Credentials Card -->
+    <div class="row justify-content-center mt-5" id="demo-accounts">
+      <div class="col-lg-10">
+        <div class="spark-card">
+          <div class="spark-card-header">
+            <span class="text-white fw-semibold">
+              <i class="bi bi-key-fill text-warning me-2"></i>Evaluator / Viva Quick Access Credentials
+            </span>
+            <span class="badge bg-primary bg-opacity-25 text-primary">Pre-Seeded in Database</span>
+          </div>
+          <div class="spark-card-body">
+            <p class="text-muted small mb-3">
+              These accounts are pre-seeded in the database using <code>python manage.py seed_demo</code>. You can also use the <strong>1-Click Quick Fill buttons</strong> on the Sign In page:
+            </p>
+            <div class="table-responsive">
+              <table class="table table-dark-spark mb-0">
+                <thead>
+                  <tr>
+                    <th>Role</th>
+                    <th>Email Address</th>
+                    <th>Password</th>
+                    <th>Permissions</th>
+                    <th class="text-end">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="badge-role-admin">ADMIN</span></td>
+                    <td><code>admin@example.com</code></td>
+                    <td><code>AdminDemoPassword123!</code></td>
+                    <td class="text-muted small">Full system, servers, alerts, user management</td>
+                    <td class="text-end">
+                      <a href="{% url 'account_login' %}" class="spark-btn-primary btn-sm py-1 px-2 text-decoration-none">Sign In &rarr;</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge-role-operator">OPERATOR</span></td>
+                    <td><code>operator@example.com</code></td>
+                    <td><code>OperatorDemoPassword123!</code></td>
+                    <td class="text-muted small">Add/edit servers, view telemetry, view alerts</td>
+                    <td class="text-end">
+                      <a href="{% url 'account_login' %}" class="spark-btn-secondary btn-sm py-1 px-2 text-decoration-none">Sign In &rarr;</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge-role-viewer">VIEWER</span></td>
+                    <td><code>viewer@example.com</code></td>
+                    <td><code>ViewerDemoPassword123!</code></td>
+                    <td class="text-muted small">Read-only dashboard telemetry & metric charts</td>
+                    <td class="text-end">
+                      <a href="{% url 'account_login' %}" class="spark-btn-secondary btn-sm py-1 px-2 text-decoration-none">Sign In &rarr;</a>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock content %}

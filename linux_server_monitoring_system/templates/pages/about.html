@@ -1,3 +1,111 @@
 {% extends "base.html" %}
+{% load i18n static %}
 
+{% block title %}About — Linux Server Monitoring & Management System{% endblock title %}
 
+{% block content %}
+<div class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <!-- About Banner -->
+      <div class="spark-card mb-4">
+        <div class="spark-card-header">
+          <span class="text-white fw-bold"><i class="bi bi-info-circle-fill text-primary me-2"></i>About the Platform</span>
+          <span class="badge bg-primary bg-opacity-25 text-primary">Academic & Production Ready</span>
+        </div>
+        <div class="spark-card-body p-4">
+          <h3 class="h4 text-white fw-bold mb-2">Centralized Agentless Linux Server Telemetry System</h3>
+          <p class="text-muted mb-4">
+            A full-stack, enterprise-grade web application engineered to monitor distributed Linux server nodes securely over SSH.
+            The system provides automated real-time telemetry extraction (CPU load, memory allocation, disk partitions, network bandwidth),
+            multi-tier Role-Based Access Control (RBAC), threshold rule evaluation, and centralized alerting.
+          </p>
+
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--spark-border);">
+                <div class="d-flex align-items-center gap-2 mb-2 text-primary">
+                  <i class="bi bi-shield-check fs-5"></i>
+                  <strong class="text-white">Security First</strong>
+                </div>
+                <p class="text-muted small mb-0">Agentless SSH with RSA key authentication, strict RBAC permissions, and encrypted session management.</p>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--spark-border);">
+                <div class="d-flex align-items-center gap-2 mb-2 text-info">
+                  <i class="bi bi-activity fs-5"></i>
+                  <strong class="text-white">Automated Pipeline</strong>
+                </div>
+                <p class="text-muted small mb-0">Asynchronous metric sampling runner evaluating system health against configurable threshold policies.</p>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--spark-border);">
+                <div class="d-flex align-items-center gap-2 mb-2 text-warning">
+                  <i class="bi bi-layers-fill fs-5"></i>
+                  <strong class="text-white">Clean Architecture</strong>
+                </div>
+                <p class="text-muted small mb-0">Decoupled Django REST API, responsive Bootstrap 5 theme, and standard systemd / Nginx production configs.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team Member Matrix -->
+      <div class="spark-card mb-4">
+        <div class="spark-card-header">
+          <span class="text-white fw-bold"><i class="bi bi-people-fill text-primary me-2"></i>Engineering Team & Architecture Modules</span>
+        </div>
+        <div class="spark-card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-dark-spark mb-0">
+              <thead>
+                <tr>
+                  <th>Module</th>
+                  <th>Assigned Role</th>
+                  <th>Key Responsibilities</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong class="text-white"><i class="bi bi-shield-shaded text-danger me-2"></i>Member 4 (Current)</strong></td>
+                  <td>Auth, RBAC, DevOps & Scaffolding</td>
+                  <td class="text-muted small">Multi-tier RBAC, Demo seeder, Frontend UI & Auth integration, Nginx/systemd configs, QA integration suite</td>
+                  <td><span class="badge bg-success bg-opacity-25 text-success">COMPLETED</span></td>
+                </tr>
+                <tr>
+                  <td><strong class="text-white"><i class="bi bi-server text-info me-2"></i>Team Lead & Member 2</strong></td>
+                  <td>Server Fleet & SSH Telemetry</td>
+                  <td class="text-muted small">Server data models, Paramiko SSH collector service, command execution, REST API endpoints</td>
+                  <td><span class="badge bg-info bg-opacity-25 text-info">IN PROGRESS</span></td>
+                </tr>
+                <tr>
+                  <td><strong class="text-white"><i class="bi bi-bell-fill text-warning me-2"></i>Member 1</strong></td>
+                  <td>Alerts & Notifications</td>
+                  <td class="text-muted small">Alert rules engine, threshold evaluation, severity mapping, notification dispatching</td>
+                  <td><span class="badge bg-warning bg-opacity-25 text-warning">IN PROGRESS</span></td>
+                </tr>
+                <tr>
+                  <td><strong class="text-white"><i class="bi bi-speedometer text-primary me-2"></i>Member 3</strong></td>
+                  <td>Telemetry Dashboard & Charts</td>
+                  <td class="text-muted small">Time-series metric visualizations, live gauges, historical trend charting</td>
+                  <td><span class="badge bg-secondary bg-opacity-25 text-muted">PLANNED</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center">
+        <a href="{% url 'home' %}" class="spark-btn-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Back to Home
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
