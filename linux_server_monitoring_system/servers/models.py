@@ -1,6 +1,7 @@
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 
+
 class Server(models.Model):
     OPERATING_SYSTEM_CHOICES = [
         ("UBUNTU", "Ubuntu"),
@@ -8,6 +9,12 @@ class Server(models.Model):
         ("CENTOS", "CentOS"),
         ("ROCKY", "Rocky Linux"),
         ("AMAZON", "Amazon Linux"),
+    ]
+
+    STATUS_CHOICES = [
+        ("UNKNOWN", "Unknown"),
+        ("UP", "Up"),
+        ("DOWN", "Down"),
     ]
 
     server_name = models.CharField(
@@ -55,6 +62,31 @@ class Server(models.Model):
     is_active = models.BooleanField(
         default=True,
         help_text="Whether monitoring is enabled for this server.",
+    )
+
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default="UNKNOWN",
+        help_text="Current monitoring status of the server.",
+    )
+
+    last_check_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When monitoring was last attempted.",
+    )
+
+    last_success_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When monitoring last succeeded.",
+    )
+
+    last_error = models.TextField(
+        blank=True,
+        default="",
+        help_text="Error from the latest failed monitoring attempt.",
     )
 
     created_at = models.DateTimeField(
