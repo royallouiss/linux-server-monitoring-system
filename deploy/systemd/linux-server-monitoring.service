@@ -5,6 +5,6 @@ After=network.target
 [Service]
 Type=oneshot
 
-WorkingDirectory=/opt/linux-server-monitoring-system
+WorkingDirectory=/home/royal/linux-server-monitoring-system
 
-ExecStart=/opt/linux-server-monitoring-system/.venv/bin/python manage.py monitor_servers
+ExecStart=/home/royal/linux-server-monitoring-system/.venv/bin/python manage.py monitor_servers
