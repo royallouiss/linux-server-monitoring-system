@@ -1,3 +1,679 @@
 {% extends "base.html" %}
+{% load static i18n %}
 
+{% block title %}
+  Fleet Dashboard - Linux Server Monitoring System
+{% endblock title %}
 
+{% block bodyclass %}dashboard-body{% endblock bodyclass %}
+
+{% block body %}
+<div class="dash-wrapper" id="dashboard-app" data-bs-theme="dark">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="dash-sidebar" id="dash-sidebar">
+    <a href="{% url 'home' %}" class="dash-brand">
+      <div class="dash-brand-icon">
+        <i class="bi bi-hdd-network"></i>
+      </div>
+      <div>
+        <span>Linux Monitor</span>
+        <div style="font-size: 0.65rem; color: var(--dash-text-muted); font-weight: normal; margin-top: -3px;">
+          Enterprise Telemetry
+        </div>
+      </div>
+    </a>
+
+    <nav class="dash-nav">
+      <div class="dash-nav-header">Observability</div>
+      <a href="#section-overview" class="dash-nav-link active">
+        <i class="bi bi-grid-1x2-fill"></i>
+        <span>Overview</span>
+      </a>
+      <a href="#section-servers" class="dash-nav-link">
+        <i class="bi bi-server"></i>
+        <span>Server Fleet</span>
+      </a>
+      <a href="#section-metrics" class="dash-nav-link">
+        <i class="bi bi-activity"></i>
+        <span>Resource Metrics</span>
+      </a>
+      <a href="#section-alerts" class="dash-nav-link">
+        <i class="bi bi-shield-exclamation"></i>
+        <span>Alerts & Events</span>
+      </a>
+
+      <div class="dash-nav-header mt-3">Administration</div>
+      <a href="{% url 'admin:index' %}" class="dash-nav-link" target="_blank">
+        <i class="bi bi-sliders"></i>
+        <span>Django Admin</span>
+      </a>
+    </nav>
+
+    <div class="dash-sidebar-footer">
+      <div class="fleet-health-pill">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+          <span class="text-muted" style="font-size: 0.72rem;">FLEET HEALTH</span>
+          <span class="status-dot online"></span>
+        </div>
+        <div class="fw-bold" id="sidebar-fleet-status">All Systems Healthy</div>
+        <div class="text-muted" style="font-size: 0.72rem;" id="sidebar-server-count">Monitoring 1 Server</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN VIEW ================= -->
+  <div class="dash-main">
+
+    <!-- Top Header -->
+    <header class="dash-header">
+      <div class="dash-header-left">
+        <button class="btn btn-sm btn-outline-secondary d-lg-none" id="sidebar-toggle" aria-label="Toggle navigation">
+          <i class="bi bi-list fs-5"></i>
+        </button>
+        <div>
+          <span class="env-badge me-2">Production</span>
+          <span class="fw-bold fs-6 d-none d-sm-inline">Linux Fleet Monitoring</span>
+        </div>
+      </div>
+
+      <div class="dash-header-right">
+        <!-- Live status -->
+        <div class="live-indicator d-none d-md-flex">
+          <span class="status-dot online"></span>
+          <span>Live Telemetry</span>
+        </div>
+
+        <!-- 30s Countdown Ticker Badge -->
+        <div class="countdown-badge d-none d-sm-flex align-items-center" id="refresh-countdown-badge" title="Auto-refresh countdown">
+          <i class="bi bi-stopwatch text-primary me-1"></i>
+          <span>Next poll: <strong id="refresh-countdown-sec">30</strong>s</span>
+        </div>
+
+        <!-- Auto-refresh interval dropdown -->
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="auto-refresh-menu" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-clock-history me-1"></i>
+            <span id="auto-refresh-label">Refresh: 30s</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="auto-refresh-menu">
+            <li><button class="dropdown-item" data-interval="15000">Every 15 seconds</button></li>
+            <li><button class="dropdown-item active-refresh" data-interval="30000">Every 30 seconds</button></li>
+            <li><button class="dropdown-item" data-interval="60000">Every 60 seconds</button></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><button class="dropdown-item text-danger" data-interval="0">Pause Auto-refresh</button></li>
+          </ul>
+        </div>
+
+        <!-- Manual Refresh Button -->
+        <button class="btn btn-sm btn-primary d-flex align-items-center gap-1" id="btn-refresh-all" title="Trigger immediate refresh">
+          <i class="bi bi-arrow-clockwise" id="refresh-icon"></i>
+          <span class="d-none d-sm-inline">Refresh</span>
+        </button>
+
+        <!-- Last Updated -->
+        <span class="text-muted d-none d-xl-inline" style="font-size: 0.8rem;">
+          Updated: <span id="last-updated-time" class="fw-medium text-light font-monospace">--:--:--</span>
+        </span>
+
+        <!-- Theme Toggle -->
+        <button class="btn btn-sm btn-outline-secondary" id="btn-theme-toggle" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
+          <i class="bi bi-moon-stars" id="theme-toggle-icon"></i>
+        </button>
+
+        <!-- Administrator Account -->
+        {% if request.user.is_authenticated %}
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-shield-lock-fill text-primary"></i>
+              <span class="d-none d-md-inline font-monospace">{{ request.user.email|default:request.user.username }}</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><h6 class="dropdown-header">System Administrator</h6></li>
+              <li><a class="dropdown-item" href="{% url 'admin:index' %}" target="_blank"><i class="bi bi-sliders me-2 text-primary"></i>Django Admin</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="{% url 'account_logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</a></li>
+            </ul>
+          </div>
+        {% else %}
+          <a href="{% url 'account_login' %}" class="btn btn-sm btn-outline-primary">Sign In</a>
+        {% endif %}
+      </div>
+    </header>
+
+    <!-- Main Content Stream -->
+    <main class="dash-content">
+
+      <!-- Global Error / Retry Banner -->
+      <div id="dash-error-banner" class="alert alert-danger alert-dismissible fade show d-none" role="alert">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <span id="dash-error-message">Unable to contact the monitoring backend API.</span>
+          </div>
+          <button type="button" class="btn btn-sm btn-danger ms-3" id="btn-error-retry">Retry Connection</button>
+        </div>
+      </div>
+
+      <!-- ================= LIVE 30s REFRESH RESULT BANNER ================= -->
+      <div id="live-refresh-bar" class="live-refresh-bar">
+        <div class="d-flex align-items-center gap-2 flex-wrap flex-grow-1">
+          <div class="d-flex align-items-center gap-2">
+            <span class="status-dot online" id="live-refresh-dot"></span>
+            <span class="fw-bold fs-7 text-light">30s Telemetry Poll:</span>
+            <span class="text-secondary small font-monospace" id="live-refresh-time">--:--:--</span>
+          </div>
+          <span class="vr mx-2 d-none d-md-inline" style="opacity: 0.25;"></span>
+          <div class="live-refresh-metrics d-flex align-items-center gap-2 flex-wrap" id="live-refresh-metrics">
+            <span class="badge bg-secondary font-monospace">Synchronizing telemetry...</span>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge badge-soft-success font-monospace" id="live-refresh-status-badge">
+            <i class="bi bi-check-circle-fill me-1"></i> 200 OK
+          </span>
+        </div>
+      </div>
+
+      <!-- ================= SECTION 1: SUMMARY KPI CARDS ================= -->
+      <section id="section-overview">
+        <div class="row g-3">
+          <!-- KPI 1: Total Servers -->
+          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+            <div class="dash-card kpi-card">
+              <div class="kpi-top">
+                <span class="kpi-label">Total Servers</span>
+                <div class="kpi-icon-box kpi-icon-servers">
+                  <i class="bi bi-hdd-stack"></i>
+                </div>
+              </div>
+              <div class="kpi-value" id="stat-total-servers">
+                <div class="skeleton-box" style="width: 50px; height: 38px;"></div>
+              </div>
+              <div class="kpi-subtext">
+                <span class="badge bg-secondary">Registered</span>
+                <span>Active fleet</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 2: Online Servers -->
+          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+            <div class="dash-card kpi-card">
+              <div class="kpi-top">
+                <span class="kpi-label">Online Servers</span>
+                <div class="kpi-icon-box kpi-icon-online">
+                  <i class="bi bi-check-circle-fill"></i>
+                </div>
+              </div>
+              <div class="kpi-value text-success" id="stat-online-servers">
+                <div class="skeleton-box" style="width: 50px; height: 38px;"></div>
+              </div>
+              <div class="kpi-subtext" id="stat-online-subtext">
+                <span class="badge bg-success">100%</span>
+                <span>Responsive</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 3: Offline Servers -->
+          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+            <div class="dash-card kpi-card">
+              <div class="kpi-top">
+                <span class="kpi-label">Offline Servers</span>
+                <div class="kpi-icon-box kpi-icon-offline">
+                  <i class="bi bi-x-circle-fill"></i>
+                </div>
+              </div>
+              <div class="kpi-value text-danger" id="stat-offline-servers">
+                <div class="skeleton-box" style="width: 50px; height: 38px;"></div>
+              </div>
+              <div class="kpi-subtext" id="stat-offline-subtext">
+                <span class="badge bg-secondary">0 Issues</span>
+                <span>All connected</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 4: Active Alerts -->
+          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+            <div class="dash-card kpi-card">
+              <div class="kpi-top">
+                <span class="kpi-label">Active Alerts</span>
+                <div class="kpi-icon-box kpi-icon-alerts">
+                  <i class="bi bi-bell-fill"></i>
+                </div>
+              </div>
+              <div class="kpi-value text-warning" id="stat-active-alerts">
+                <div class="skeleton-box" style="width: 50px; height: 38px;"></div>
+              </div>
+              <div class="kpi-subtext" id="stat-alerts-subtext">
+                <span class="badge bg-secondary">0 Critical</span>
+                <span>Fleet normal</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 5: Fleet Avg CPU (with 30s variation Δ) -->
+          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+            <div class="dash-card kpi-card">
+              <div class="kpi-top">
+                <span class="kpi-label">Fleet Avg CPU</span>
+                <div class="kpi-icon-box" style="background: var(--dash-info-subtle); color: var(--dash-info);">
+                  <i class="bi bi-cpu"></i>
+                </div>
+              </div>
+              <div class="kpi-value text-info font-monospace" id="stat-avg-cpu">
+                0.0%
+              </div>
+              <div class="kpi-subtext" id="stat-avg-cpu-subtext">
+                <span class="badge-delta badge-delta-neutral font-monospace" id="stat-avg-cpu-delta">0.00%</span>
+                <span class="small text-muted">30s Δ</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 6: Fleet Avg RAM (with 30s variation Δ) -->
+          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+            <div class="dash-card kpi-card">
+              <div class="kpi-top">
+                <span class="kpi-label">Fleet Avg RAM</span>
+                <div class="kpi-icon-box" style="background: var(--dash-success-subtle); color: var(--dash-success);">
+                  <i class="bi bi-memory"></i>
+                </div>
+              </div>
+              <div class="kpi-value text-success font-monospace" id="stat-avg-memory">
+                0.0%
+              </div>
+              <div class="kpi-subtext" id="stat-avg-memory-subtext">
+                <span class="badge-delta badge-delta-neutral font-monospace" id="stat-avg-memory-delta">0.00%</span>
+                <span class="small text-muted">30s Δ</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= SECTION 2: SERVER FLEET HEALTH ================= -->
+      <section id="section-servers" class="dash-card">
+        <div class="dash-card-header flex-wrap gap-2">
+          <div>
+            <h2 class="dash-card-title">
+              <i class="bi bi-server text-primary"></i>
+              Server Health & Status
+            </h2>
+            <span class="text-muted" style="font-size: 0.8rem;">Live health telemetry collected via SSH</span>
+          </div>
+
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Search -->
+            <div class="server-search-box">
+              <i class="bi bi-search"></i>
+              <input type="text" class="server-search-input" id="server-search-input" placeholder="Search servers, IPs..." aria-label="Search servers">
+            </div>
+
+            <!-- Status Filter Buttons -->
+            <div class="btn-group btn-group-sm" role="group" aria-label="Filter servers by status">
+              <button type="button" class="btn btn-outline-secondary active" data-server-filter="ALL">All</button>
+              <button type="button" class="btn btn-outline-secondary" data-server-filter="UP">Online</button>
+              <button type="button" class="btn btn-outline-secondary" data-server-filter="DOWN">Offline</button>
+              <button type="button" class="btn btn-outline-secondary" data-server-filter="UNKNOWN">Unknown</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Servers Table -->
+        <div class="dash-table-wrapper">
+          <table class="dash-table" id="servers-table">
+            <thead>
+              <tr>
+                <th>Server & Hostname</th>
+                <th>Status</th>
+                <th>CPU Usage (30s Δ)</th>
+                <th>Memory Usage (30s Δ)</th>
+                <th>Disk Space (30s Δ)</th>
+                <th>Network Traffic (30s Δ)</th>
+                <th>Last Checked</th>
+                <th>Alerts</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="servers-table-body">
+              <!-- Loading Skeletons -->
+              <tr>
+                <td colspan="9">
+                  <div class="d-flex flex-column gap-2 py-3">
+                    <div class="skeleton-box" style="height: 24px; width: 100%;"></div>
+                    <div class="skeleton-box" style="height: 24px; width: 100%;"></div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty State -->
+        <div id="servers-empty-state" class="empty-state-box d-none">
+          <div class="empty-state-icon">
+            <i class="bi bi-hdd-network text-muted"></i>
+          </div>
+          <h5 class="text-light">No Servers Match Your Query</h5>
+          <p class="text-muted small">Try modifying your search or clearing the status filter.</p>
+          <button class="btn btn-sm btn-outline-primary" id="btn-clear-search">Reset Filters</button>
+        </div>
+      </section>
+
+      <!-- ================= SECTION 3: RESOURCE OVERVIEW & CHARTS ================= -->
+      <section id="section-metrics" class="dash-card">
+        <div class="dash-card-header flex-wrap gap-2">
+          <div>
+            <h2 class="dash-card-title">
+              <i class="bi bi-graph-up text-info"></i>
+              Resource Telemetry & Trends
+            </h2>
+            <span class="text-muted" style="font-size: 0.8rem;">Historical CPU, Memory, Disk, and Network samples</span>
+          </div>
+
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Server Selector -->
+            <select class="form-select form-select-sm" id="chart-server-select" style="max-width: 220px; background-color: var(--dash-bg); color: var(--dash-text-primary); border-color: var(--dash-border);" aria-label="Select server for charts">
+              <option value="">Loading servers...</option>
+            </select>
+
+            <!-- Time Range Selector -->
+            <div class="btn-group btn-group-sm" role="group" aria-label="Time range selector">
+              <button type="button" class="btn btn-outline-secondary" data-range="1h">1h</button>
+              <button type="button" class="btn btn-outline-secondary" data-range="6h">6h</button>
+              <button type="button" class="btn btn-outline-secondary active" data-range="24h">24h</button>
+              <button type="button" class="btn btn-outline-secondary" data-range="7d">7d</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Grid Charts -->
+        <div class="row g-3">
+          <!-- Chart 1: CPU -->
+          <div class="col-12 col-lg-6">
+            <div class="dash-card chart-card">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold small text-light"><i class="bi bi-cpu me-1 text-primary"></i> CPU Utilization (%)</span>
+                <div class="d-flex align-items-center gap-1">
+                  <span class="badge badge-soft-info font-monospace" id="current-cpu-badge">0.0%</span>
+                  <span class="badge-delta badge-delta-neutral font-monospace" id="delta-cpu-badge" title="30-second variation (Δ)">0.00%</span>
+                </div>
+              </div>
+              <div class="chart-canvas-container">
+                <canvas id="chart-cpu"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart 2: Memory -->
+          <div class="col-12 col-lg-6">
+            <div class="dash-card chart-card">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold small text-light"><i class="bi bi-memory me-1 text-success"></i> Memory Usage (%)</span>
+                <div class="d-flex align-items-center gap-1">
+                  <span class="badge badge-soft-success font-monospace" id="current-mem-badge">0.0%</span>
+                  <span class="badge-delta badge-delta-neutral font-monospace" id="delta-mem-badge" title="30-second variation (Δ)">0.00%</span>
+                </div>
+              </div>
+              <div class="chart-canvas-container">
+                <canvas id="chart-memory"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart 3: Disk -->
+          <div class="col-12 col-lg-6">
+            <div class="dash-card chart-card">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold small text-light"><i class="bi bi-disc me-1 text-warning"></i> Disk Storage (/)</span>
+                <div class="d-flex align-items-center gap-1">
+                  <span class="badge badge-soft-warning font-monospace" id="current-disk-badge">0.0%</span>
+                  <span class="badge-delta badge-delta-neutral font-monospace" id="delta-disk-badge" title="30-second variation (Δ)">0.00%</span>
+                </div>
+              </div>
+              <div class="chart-canvas-container">
+                <canvas id="chart-disk"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart 4: Network -->
+          <div class="col-12 col-lg-6">
+            <div class="dash-card chart-card">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-bold small text-light"><i class="bi bi-arrow-down-up me-1 text-info"></i> Network Traffic (KB/s)</span>
+                <div class="d-flex align-items-center gap-1">
+                  <span class="badge badge-soft-info font-monospace" id="current-net-badge">0.0 KB/s</span>
+                  <span class="badge-delta badge-delta-neutral font-monospace" id="delta-net-badge" title="30-second variation (Δ)">0.00 KB/s</span>
+                </div>
+              </div>
+              <div class="chart-canvas-container">
+                <canvas id="chart-network"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= SECTION 4: ALERTS & INCIDENTS ================= -->
+      <section id="section-alerts" class="dash-card">
+        <div class="dash-card-header flex-wrap gap-2">
+          <div>
+            <h2 class="dash-card-title">
+              <i class="bi bi-shield-exclamation text-warning"></i>
+              Alerts & Incident Feed
+            </h2>
+            <span class="text-muted" style="font-size: 0.8rem;">System alerts triggered by thresholds and connection status</span>
+          </div>
+
+          <div class="btn-group btn-group-sm" role="group" aria-label="Filter alerts">
+            <button type="button" class="btn btn-outline-secondary active" data-alert-filter="ACTIVE">Active</button>
+            <button type="button" class="btn btn-outline-secondary" data-alert-filter="CRITICAL">Critical</button>
+            <button type="button" class="btn btn-outline-secondary" data-alert-filter="WARNING">Warning</button>
+            <button type="button" class="btn btn-outline-secondary" data-alert-filter="RESOLVED">Resolved</button>
+            <button type="button" class="btn btn-outline-secondary" data-alert-filter="ALL">All</button>
+          </div>
+        </div>
+
+        <div id="alerts-list-container" class="d-flex flex-column gap-2">
+          <!-- Injected dynamically via dashboard.js -->
+        </div>
+
+        <div id="alerts-empty-state" class="empty-state-box">
+          <div class="empty-state-icon">
+            <i class="bi bi-shield-check text-success"></i>
+          </div>
+          <h5 class="text-light">All Systems Normal</h5>
+          <p class="text-muted small mb-0">No active alerts detected across the fleet.</p>
+        </div>
+      </section>
+
+      <!-- ================= SECTION 5: LIVE 30S REFRESH & MONITORING STREAM ================= -->
+      <section id="section-activity" class="dash-card">
+        <div class="dash-card-header flex-wrap gap-2">
+          <div>
+            <h2 class="dash-card-title">
+              <i class="bi bi-clock-history text-secondary"></i>
+              Live 30s Refresh & System Monitoring Stream
+            </h2>
+            <span class="text-muted" style="font-size: 0.8rem;">Chronological telemetry stream captured every 30-second monitoring cycle</span>
+          </div>
+          <span class="badge badge-soft-info d-flex align-items-center gap-1 font-monospace">
+            <span class="status-dot online"></span>
+            <span>30s Active Stream</span>
+          </span>
+        </div>
+        <div class="dash-table-wrapper">
+          <table class="dash-table" id="activity-table">
+            <thead>
+              <tr>
+                <th>Poll Timestamp</th>
+                <th>Server</th>
+                <th>Status</th>
+                <th>Collected Metrics Snapshot</th>
+                <th>30s Variation (Δ)</th>
+                <th>Poll Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="activity-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ================= SERVER DRILL-DOWN MODAL ================= -->
+<div class="modal fade dash-modal" id="serverDetailModal" tabindex="-1" aria-labelledby="serverDetailModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold" id="serverDetailModalLabel">
+            <i class="bi bi-server text-primary me-2"></i>
+            <span id="modal-server-name">Server Details</span>
+          </h5>
+          <div class="text-muted small" id="modal-server-hostname">192.168.1.1</div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Status & Meta Row -->
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6 col-md-3">
+            <div class="p-3 border rounded bg-opacity-25" style="border-color: var(--dash-border) !important;">
+              <div class="text-muted small">STATUS</div>
+              <div class="fw-bold fs-6 mt-1" id="modal-server-status">--</div>
+            </div>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <div class="p-3 border rounded bg-opacity-25" style="border-color: var(--dash-border) !important;">
+              <div class="text-muted small">OPERATING SYSTEM</div>
+              <div class="fw-bold fs-6 mt-1" id="modal-server-os">--</div>
+            </div>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <div class="p-3 border rounded bg-opacity-25" style="border-color: var(--dash-border) !important;">
+              <div class="text-muted small">SSH PORT / USER</div>
+              <div class="fw-bold fs-6 mt-1" id="modal-server-ssh">--</div>
+            </div>
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <div class="p-3 border rounded bg-opacity-25" style="border-color: var(--dash-border) !important;">
+              <div class="text-muted small">LAST CHECK</div>
+              <div class="fw-bold fs-6 mt-1" id="modal-server-lastcheck">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Telemetry Gauges -->
+        <h6 class="fw-bold text-light mb-3">Live Resource Breakdown</h6>
+        <div class="row g-3 mb-4">
+          <!-- CPU -->
+          <div class="col-md-4">
+            <div class="p-3 border rounded" style="border-color: var(--dash-border) !important; background-color: var(--dash-surface-subtle);">
+              <div class="d-flex justify-content-between mb-1">
+                <span class="small fw-semibold">CPU Usage</span>
+                <span class="small fw-bold text-primary" id="modal-cpu-pct">0.0%</span>
+              </div>
+              <div class="meter-track mb-2">
+                <div class="meter-fill meter-fill-normal" id="modal-cpu-bar" style="width: 0%;"></div>
+              </div>
+              <div class="text-muted" style="font-size: 0.72rem;" id="modal-cpu-load">Load: 0.00, 0.00, 0.00</div>
+            </div>
+          </div>
+
+          <!-- Memory -->
+          <div class="col-md-4">
+            <div class="p-3 border rounded" style="border-color: var(--dash-border) !important; background-color: var(--dash-surface-subtle);">
+              <div class="d-flex justify-content-between mb-1">
+                <span class="small fw-semibold">Memory Usage</span>
+                <span class="small fw-bold text-success" id="modal-mem-pct">0.0%</span>
+              </div>
+              <div class="meter-track mb-2">
+                <div class="meter-fill meter-fill-normal" id="modal-mem-bar" style="width: 0%;"></div>
+              </div>
+              <div class="text-muted" style="font-size: 0.72rem;" id="modal-mem-gb">0 GB / 0 GB</div>
+            </div>
+          </div>
+
+          <!-- Disk -->
+          <div class="col-md-4">
+            <div class="p-3 border rounded" style="border-color: var(--dash-border) !important; background-color: var(--dash-surface-subtle);">
+              <div class="d-flex justify-content-between mb-1">
+                <span class="small fw-semibold">Disk Usage</span>
+                <span class="small fw-bold text-warning" id="modal-disk-pct">0.0%</span>
+              </div>
+              <div class="meter-track mb-2">
+                <div class="meter-fill meter-fill-normal" id="modal-disk-bar" style="width: 0%;"></div>
+              </div>
+              <div class="text-muted" style="font-size: 0.72rem;" id="modal-disk-gb">0 GB / 0 GB</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Network Interface Breakdown -->
+        <h6 class="fw-bold text-light mb-2">Network Interface</h6>
+        <div class="p-3 border rounded mb-4" style="border-color: var(--dash-border) !important; background-color: var(--dash-surface-subtle);">
+          <div class="row g-2 text-center">
+            <div class="col-3">
+              <span class="text-muted d-block small">Interface</span>
+              <span class="fw-bold" id="modal-net-iface">eth0</span>
+            </div>
+            <div class="col-3">
+              <span class="text-muted d-block small">Receive Rate</span>
+              <span class="fw-bold text-info" id="modal-net-rx">0 KB/s</span>
+            </div>
+            <div class="col-3">
+              <span class="text-muted d-block small">Transmit Rate</span>
+              <span class="fw-bold text-info" id="modal-net-tx">0 KB/s</span>
+            </div>
+            <div class="col-3">
+              <span class="text-muted d-block small">Total Transferred</span>
+              <span class="fw-bold" id="modal-net-total">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diagnostics / Error section -->
+        <div id="modal-error-box" class="d-none mb-3">
+          <h6 class="fw-bold text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i> Diagnostic Error Log</h6>
+          <div class="terminal-box text-danger" id="modal-error-text">
+            No errors reported.
+          </div>
+        </div>
+
+        <!-- Live Connection Test Console -->
+        <div class="mt-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="fw-bold text-light mb-0"><i class="bi bi-terminal me-1"></i> Live SSH Diagnostic Test</h6>
+            <button class="btn btn-sm btn-outline-primary" id="btn-modal-test-ssh">
+              <i class="bi bi-plug me-1"></i> Test SSH Connection
+            </button>
+          </div>
+          <div class="terminal-box" id="modal-ssh-output">
+            Click "Test SSH Connection" to verify server reachability and credentials via paramiko.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-sm btn-success" id="btn-modal-collect">
+          <i class="bi bi-arrow-repeat me-1"></i> Collect Metrics Now
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating Toast Container -->
+<div id="dashboard-toast-container" aria-live="polite" aria-atomic="true"></div>
+{% endblock body %}
