@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Linux Server Monitoring Every 30 Seconds
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=30sec
+Unit=linux-server-monitoring.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,121 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <style>
+    body.login {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      background: radial-gradient(circle at top center, #1a2234 0%, #0b0f19 70%) !important;
+    }
+    body.login #header {
+      border-bottom: 1px solid var(--admin-border-subtle);
+    }
+    body.login #container {
+      max-width: 440px;
+      margin: 60px auto auto auto;
+      background: var(--admin-bg-surface);
+      border: 1px solid var(--admin-border-bright);
+      border-radius: var(--admin-radius-lg);
+      box-shadow: var(--admin-shadow-lg);
+      overflow: hidden;
+    }
+    body.login #content {
+      padding: 32px !important;
+    }
+    .admin-login-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .admin-login-icon {
+      font-size: 2.5rem;
+      color: var(--admin-accent);
+      margin-bottom: 8px;
+    }
+    .admin-login-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0;
+    }
+    .admin-login-subtitle {
+      font-size: 0.8rem;
+      color: var(--admin-text-secondary);
+      margin-top: 4px;
+    }
+    body.login .form-row {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      padding: 10px 0 !important;
+      border-bottom: none !important;
+    }
+    body.login .form-row label {
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+    }
+    body.login .form-row input {
+      width: 100% !important;
+      padding: 10px 14px !important;
+    }
+    body.login .submit-row {
+      background: transparent !important;
+      border: none !important;
+      padding: 12px 0 0 0 !important;
+      margin-top: 12px !important;
+    }
+    body.login .submit-row input[type="submit"] {
+      width: 100% !important;
+      padding: 12px !important;
+      font-size: 0.9rem !important;
+      background: linear-gradient(135deg, #1d4ed8, #3b82f6) !important;
+    }
+  </style>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} login{% endblock %}
+{% block nav-global %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+{% block content_title %}{% endblock %}
+{% block breadcrumbs %}{% endblock %}
+
+{% block content %}
+  <div class="admin-login-header">
+    <i class="bi bi-shield-lock-fill admin-login-icon"></i>
+    <h2 class="admin-login-title">Administrator Sign In</h2>
+    <p class="admin-login-subtitle">Linux Server Monitoring System</p>
+  </div>
+
+  {% if form.errors and not form.non_field_errors %}
+    <p class="errornote">
+      {% blocktranslate count counter=form.errors.items|length %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktranslate %}
+    </p>
+  {% endif %}
+
+  {% if form.non_field_errors %}
+    {% for error in form.non_field_errors %}
+      <p class="errornote">{{ error }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <div id="content-main">
+    <form action="{{ app_path }}" method="post" id="login-form">
+      {% csrf_token %}
+      <div class="form-row">
+        {{ form.username.errors }}
+        {{ form.username.label_tag }}
+        {{ form.username }}
+      </div>
+      <div class="form-row">
+        {{ form.password.errors }}
+        {{ form.password.label_tag }}
+        {{ form.password }}
+        <input type="hidden" name="next" value="{{ next }}">
+      </div>
+      <div class="submit-row">
+        <input type="submit" value="{% translate 'Sign In to Admin' %}">
+      </div>
+    </form>
+  </div>
+{% endblock %}
