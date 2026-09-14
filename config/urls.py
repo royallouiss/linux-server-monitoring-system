@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.auth.decorators import login_required
 from django.urls import include
 from django.urls import path
 from django.views import defaults as default_views
@@ -9,8 +10,16 @@ from drf_spectacular.views import SpectacularAPIView
 from drf_spectacular.views import SpectacularSwaggerView
 from rest_framework.authtoken.views import obtain_auth_token
 
+admin.site.site_header = "Linux Server Monitoring System"
+admin.site.site_title = "Monitoring System Admin"
+admin.site.index_title = "Fleet Administration & Telemetry Management"
+
 urlpatterns = [
-    path("", TemplateView.as_view(template_name="pages/home.html"), name="home"),
+    path(
+        "",
+        login_required(TemplateView.as_view(template_name="pages/home.html")),
+        name="home",
+    ),
     path(
         "about/",
         TemplateView.as_view(template_name="pages/about.html"),
@@ -19,7 +28,10 @@ urlpatterns = [
     # Django Admin, use {% url 'admin:index' %}
     path(settings.ADMIN_URL, admin.site.urls),
     # User management
-    path("users/", include("linux_server_monitoring_system.users.urls", namespace="users")),
+    path(
+        "users/",
+        include("linux_server_monitoring_system.users.urls", namespace="users"),
+    ),
     path("accounts/", include("allauth.urls")),
     # Your stuff: custom urls includes go here
     # ...
