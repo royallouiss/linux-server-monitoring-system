@@ -166,6 +166,8 @@ class AlertSerializer(serializers.ModelSerializer):
             "server",
             "server_name",
             "server_hostname",
+            "rule",
+            "metric_name",
             "title",
             "message",
             "severity",

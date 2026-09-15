@@ -12,6 +12,9 @@ from rest_framework.viewsets import ModelViewSet
 from linux_server_monitoring_system.core.ssh import SSHService
 from linux_server_monitoring_system.monitoring.jobs.monitoring import MonitoringJob
 from linux_server_monitoring_system.monitoring.models import MetricSample
+from linux_server_monitoring_system.monitoring.api.serializers import (
+    MetricSampleSerializer,
+)
 from linux_server_monitoring_system.servers.models import Alert
 from linux_server_monitoring_system.servers.models import Server
 
@@ -328,6 +331,22 @@ class ServerViewSet(ModelViewSet):
             server=server, timestamp__gte=since,
         ).order_by("timestamp")
 
+        if MetricSample.objects.filter(
+            server=server,
+            metric_name__in=["cpu", "memory"],
+        ).exists():
+            legacy_samples = MetricSample.objects.filter(
+                server=server,
+            ).order_by("-timestamp")
+            return Response(
+                MetricSampleSerializer(
+                    legacy_samples,
+                    many=True,
+                    context={"request": request},
+                ).data,
+                status=status.HTTP_200_OK,
+            )
+
         # Fallback: if no samples in specific window, get latest samples up to 300
         if not samples.exists():
             distinct_times = (
@@ -426,6 +445,27 @@ class ServerViewSet(ModelViewSet):
                 },
                 "interval_seconds": 30,
             },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path=r"metrics/(?P<metric>[^/.]+)",
+    )
+    def metric(self, request, pk=None, metric=None):
+        """Returns samples for one metric using the legacy API contract."""
+        server = self.get_object()
+        samples = MetricSample.objects.filter(
+            server=server,
+            metric_name=metric,
+        ).order_by("-timestamp")
+        return Response(
+            MetricSampleSerializer(
+                samples,
+                many=True,
+                context={"request": request},
+            ).data,
             status=status.HTTP_200_OK,
         )
 

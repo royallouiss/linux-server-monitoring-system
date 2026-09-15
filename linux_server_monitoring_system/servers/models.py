@@ -114,6 +114,20 @@ class Alert(models.Model):
         ACKNOWLEDGED = "ACKNOWLEDGED", "Acknowledged"
         RESOLVED = "RESOLVED", "Resolved"
 
+    rule = models.ForeignKey(
+        "AlertRule",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alerts",
+        help_text="The rule that generated this alert, when applicable.",
+    )
+    metric_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="The metric evaluated when this alert was generated.",
+    )
+
     server = models.ForeignKey(
         Server,
         on_delete=models.CASCADE,
@@ -158,4 +172,54 @@ class Alert(models.Model):
     def resolve(self):
         self.status = self.Status.RESOLVED
         self.resolved_at = timezone.now()
-        self.save(update_fields=["status", "resolved_at"])
+        self.save(update_fields=["status", "resolved_at"])
+
+
+class AlertRule(models.Model):
+    class Operator(models.TextChoices):
+        GREATER_THAN = ">", "Greater than"
+        GREATER_THAN_OR_EQUAL = ">=", "Greater than or equal to"
+        LESS_THAN = "<", "Less than"
+        LESS_THAN_OR_EQUAL = "<=", "Less than or equal to"
+        EQUAL = "=", "Equal to"
+        NOT_EQUAL = "!=", "Not equal to"
+
+    metric_name = models.CharField(
+        max_length=255,
+        help_text="Metric name, or server_status for availability rules.",
+    )
+    operator = models.CharField(
+        max_length=2,
+        choices=Operator.choices,
+    )
+    threshold = models.CharField(
+        max_length=50,
+        help_text="Numeric threshold or a server status such as DOWN.",
+    )
+    severity = models.CharField(
+        max_length=20,
+        choices=Alert.Severity.choices,
+        default=Alert.Severity.WARNING,
+    )
+    enabled = models.BooleanField(default=True)
+    server = models.ForeignKey(
+        Server,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="alert_rules",
+        help_text="Leave empty to apply this rule to every server.",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["server", "metric_name", "operator", "threshold"],
+                name="unique_alert_rule_scope",
+            ),
+        ]
+        ordering = ["metric_name", "id"]
+
+    def __str__(self):
+        scope = self.server.server_name if self.server else "all servers"
+        return f"{self.metric_name} {self.operator} {self.threshold} ({scope})"

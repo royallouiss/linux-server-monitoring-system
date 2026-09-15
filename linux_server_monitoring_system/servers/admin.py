@@ -7,6 +7,7 @@ from django.utils.html import format_html
 from linux_server_monitoring_system.core.ssh import SSHService
 
 from .models import Alert
+from .models import AlertRule
 from .models import Server
 
 
@@ -294,3 +295,27 @@ class AlertAdmin(admin.ModelAdmin):
             f"Marked {updated} alert(s) as ACTIVE.",
             level=messages.INFO,
         )
+
+
+@admin.register(AlertRule)
+class AlertRuleAdmin(admin.ModelAdmin):
+    list_display = (
+        "metric_name",
+        "operator",
+        "threshold",
+        "severity",
+        "server",
+        "enabled",
+    )
+
+    list_filter = (
+        "metric_name",
+        "severity",
+        "enabled",
+    )
+
+    search_fields = (
+        "metric_name",
+        "threshold",
+        "server__server_name",
+    )
