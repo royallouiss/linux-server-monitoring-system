@@ -1,0 +1,196 @@
+{% extends "admin/index.html" %}
+{% load i18n static admin_monitoring_tags %}
+
+{% block content %}
+  {% get_admin_monitoring_stats as mon_stats %}
+
+  <!-- ================= HERO WELCOME & COMMAND HEADER ================= -->
+  <div class="admin-command-hero">
+    <div class="admin-command-hero-content">
+      <div class="admin-command-hero-badge">
+        <span class="pulse-indicator"></span>
+        <span>Telemetry Engine Active &bull; 30s Sampling Interval</span>
+      </div>
+      <h1 class="admin-command-hero-title">Infrastructure & Telemetry Command Center</h1>
+      <p class="admin-command-hero-desc">
+        Centralized server administration, automated SSH health checks, and time-series resource metric inspection.
+      </p>
+    </div>
+    <div class="admin-command-hero-actions">
+      <a href="{% url 'home' %}" class="btn-hero btn-hero-primary" title="Switch to Live Telemetry Monitoring Dashboard">
+        <i class="bi bi-speedometer2"></i>
+        <span>Live Telemetry Dashboard</span>
+      </a>
+      <a href="{% url 'admin:servers_server_add' %}" class="btn-hero btn-hero-glass" title="Register a new Linux server">
+        <i class="bi bi-plus-circle"></i>
+        <span>Add Monitored Server</span>
+      </a>
+      <a href="{% url 'admin:servers_alert_changelist' %}?status__exact=ACTIVE" class="btn-hero btn-hero-glass" title="Inspect active incident alerts">
+        <i class="bi bi-shield-exclamation"></i>
+        <span>Active Incidents ({{ mon_stats.active_alerts }})</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ================= 4 HERO KPI STAT CARDS ================= -->
+  <div class="admin-hero-grid">
+    <!-- Card 1: Monitored Servers -->
+    <div class="admin-kpi-card" style="--card-accent: #3b82f6; --card-glow: rgba(59, 130, 246, 0.2);">
+      <div class="admin-kpi-header">
+        <span class="admin-kpi-title">Monitored Fleet</span>
+        <div class="admin-kpi-icon-wrapper" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+          <i class="bi bi-hdd-network"></i>
+        </div>
+      </div>
+      <div class="admin-kpi-value">{{ mon_stats.total_servers }}</div>
+      <div class="admin-kpi-progress">
+        <div class="admin-kpi-progress-fill" style="width: {{ mon_stats.health_pct }}%; background: #3b82f6;"></div>
+      </div>
+      <div class="admin-kpi-subtext">
+        <span class="badge-admin-status badge-admin-up"><span class="badge-dot badge-dot-up"></span> {{ mon_stats.online_servers }} UP</span>
+        {% if mon_stats.offline_servers > 0 %}
+          <span class="badge-admin-status badge-admin-down ms-1"><span class="badge-dot badge-dot-down"></span> {{ mon_stats.offline_servers }} DOWN</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Card 2: Fleet Availability -->
+    <div class="admin-kpi-card" style="--card-accent: {% if mon_stats.offline_servers > 0 %}#f59e0b{% else %}#10b981{% endif %}; --card-glow: {% if mon_stats.offline_servers > 0 %}rgba(245, 158, 11, 0.2){% else %}rgba(16, 185, 129, 0.2){% endif %};">
+      <div class="admin-kpi-header">
+        <span class="admin-kpi-title">Fleet Availability</span>
+        <div class="admin-kpi-icon-wrapper" style="background: {% if mon_stats.offline_servers > 0 %}rgba(245, 158, 11, 0.15){% else %}rgba(16, 185, 129, 0.15){% endif %}; color: {% if mon_stats.offline_servers > 0 %}#fbbf24{% else %}#34d399{% endif %};">
+          <i class="bi bi-activity"></i>
+        </div>
+      </div>
+      <div class="admin-kpi-value text-gradient-{% if mon_stats.offline_servers > 0 %}amber{% else %}emerald{% endif %}">{{ mon_stats.health_pct }}%</div>
+      <div class="admin-kpi-progress">
+        <div class="admin-kpi-progress-fill" style="width: {{ mon_stats.health_pct }}%; background: {% if mon_stats.offline_servers > 0 %}#f59e0b{% else %}#10b981{% endif %};"></div>
+      </div>
+      <div class="admin-kpi-subtext">
+        {% if mon_stats.offline_servers > 0 %}
+          <span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Fleet requires attention</span>
+        {% else %}
+          <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>All nodes healthy & responsive</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Card 3: Active Alerts -->
+    <div class="admin-kpi-card" style="--card-accent: {% if mon_stats.critical_alerts > 0 %}#ef4444{% elif mon_stats.active_alerts > 0 %}#f59e0b{% else %}#10b981{% endif %}; --card-glow: {% if mon_stats.critical_alerts > 0 %}rgba(239, 68, 68, 0.2){% else %}rgba(16, 185, 129, 0.2){% endif %};">
+      <div class="admin-kpi-header">
+        <span class="admin-kpi-title">Active Incidents</span>
+        <div class="admin-kpi-icon-wrapper" style="background: {% if mon_stats.critical_alerts > 0 %}rgba(239, 68, 68, 0.15){% elif mon_stats.active_alerts > 0 %}rgba(245, 158, 11, 0.15){% else %}rgba(16, 185, 129, 0.15){% endif %}; color: {% if mon_stats.critical_alerts > 0 %}#f87171{% elif mon_stats.active_alerts > 0 %}#fbbf24{% else %}#34d399{% endif %};">
+          <i class="bi bi-shield-{% if mon_stats.active_alerts > 0 %}exclamation{% else %}check{% endif %}"></i>
+        </div>
+      </div>
+      <div class="admin-kpi-value">{{ mon_stats.active_alerts }}</div>
+      <div class="admin-kpi-progress">
+        <div class="admin-kpi-progress-fill" style="width: {% if mon_stats.active_alerts > 0 %}100{% else %}0{% endif %}%; background: {% if mon_stats.critical_alerts > 0 %}#ef4444{% else %}#f59e0b{% endif %};"></div>
+      </div>
+      <div class="admin-kpi-subtext">
+        {% if mon_stats.critical_alerts > 0 %}
+          <span class="badge-admin-status badge-admin-critical">{{ mon_stats.critical_alerts }} Critical Incidents</span>
+        {% elif mon_stats.active_alerts > 0 %}
+          <span class="badge-admin-status badge-admin-warning">{{ mon_stats.active_alerts }} Warnings Pending</span>
+        {% else %}
+          <span class="text-success"><i class="bi bi-shield-check me-1"></i>Zero active incidents</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Card 4: Telemetry Samples -->
+    <div class="admin-kpi-card" style="--card-accent: #06b6d4; --card-glow: rgba(6, 182, 212, 0.2);">
+      <div class="admin-kpi-header">
+        <span class="admin-kpi-title">Telemetry Pipeline</span>
+        <div class="admin-kpi-icon-wrapper" style="background: rgba(6, 182, 212, 0.15); color: #38bdf8;">
+          <i class="bi bi-cpu"></i>
+        </div>
+      </div>
+      <div class="admin-kpi-value">{{ mon_stats.total_metrics }}</div>
+      <div class="admin-kpi-progress">
+        <div class="admin-kpi-progress-fill" style="width: 100%; background: #06b6d4;"></div>
+      </div>
+      <div class="admin-kpi-subtext">
+        <span class="text-info"><i class="bi bi-arrow-repeat me-1"></i>Captured SSH Metric Samples</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= LIVE MONITORED SERVERS QUICK VIEW ================= -->
+  {% if mon_stats.servers %}
+    <div class="admin-fleet-preview-card">
+      <div class="admin-fleet-preview-header">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-hdd-stack-fill text-primary fs-5"></i>
+          <div>
+            <h3 class="admin-fleet-preview-title">Connected Server Fleet</h3>
+            <span class="admin-fleet-preview-subtitle">Quick health overview of registered nodes and SSH connectivity</span>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <a href="{% url 'admin:servers_server_changelist' %}" class="btn-admin-preview-action">
+            <span>Manage All Servers</span>
+            <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="admin-fleet-table">
+          <thead>
+            <tr>
+              <th>Server Name</th>
+              <th>Host Address</th>
+              <th>Status</th>
+              <th>Operating System</th>
+              <th>SSH Access</th>
+              <th>Last SSH Check</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in mon_stats.servers %}
+              <tr>
+                <td class="fw-bold">
+                  <a href="{% url 'admin:servers_server_change' s.pk %}" class="server-name-link">
+                    {{ s.server_name }}
+                  </a>
+                </td>
+                <td class="font-monospace small text-muted">{{ s.hostname }}</td>
+                <td>
+                  {% if s.status == "UP" %}
+                    <span class="badge-admin-status badge-admin-up"><span class="badge-dot badge-dot-up"></span> ONLINE</span>
+                  {% elif s.status == "DOWN" %}
+                    <span class="badge-admin-status badge-admin-down" title="{{ s.last_error }}"><span class="badge-dot badge-dot-down"></span> OFFLINE</span>
+                  {% else %}
+                    <span class="badge-admin-status badge-admin-unknown"><span class="badge-dot badge-dot-unknown"></span> UNKNOWN</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge-os {% if 'ubuntu' in s.operating_system|lower %}badge-os-ubuntu{% elif 'debian' in s.operating_system|lower %}badge-os-debian{% endif %}">
+                    <i class="bi bi-terminal me-1"></i>{{ s.operating_system|default:"Linux" }}
+                  </span>
+                </td>
+                <td class="font-monospace small text-secondary">
+                  {{ s.username }}@:{{ s.ssh_port }}
+                </td>
+                <td class="font-monospace small text-muted">
+                  {{ s.last_check_at|date:"Y-m-d H:i:s"|default:"Pending check" }}
+                </td>
+                <td class="text-end">
+                  <a href="{% url 'admin:servers_server_change' s.pk %}" class="btn-table-action" title="View/Edit in Admin">
+                    <i class="bi bi-gear-fill me-1"></i>Configure
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- ================= DJANGO APP MODULES & RECENT ACTIONS ================= -->
+  {{ block.super }}
+
+{% endblock %}
