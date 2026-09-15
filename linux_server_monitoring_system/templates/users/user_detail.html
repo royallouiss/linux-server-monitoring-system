@@ -1,75 +1,41 @@
 {% extends "base.html" %}
-{% load static i18n %}
 
-{% block title %}User Profile — {{ object.email }}{% endblock title %}
+{% load static %}
 
+{% block title %}
+  User: 
+  
+    {{ object.name }}
+  
+  
+{% endblock title %}
 {% block content %}
-<div class="container py-4">
-  <div class="row justify-content-center">
-    <div class="col-lg-8">
-      <div class="spark-card">
-        <div class="spark-card-header">
-          <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-person-circle fs-5 text-primary"></i>
-            <span class="text-white fw-bold">User Account Profile</span>
-          </div>
-          {% if object.is_admin_role %}
-            <span class="badge-role-admin">ADMINISTRATOR</span>
-          {% elif object.is_operator_role %}
-            <span class="badge-role-operator">OPERATOR</span>
-          {% else %}
-            <span class="badge-role-viewer">VIEWER</span>
-          {% endif %}
-        </div>
-        <div class="spark-card-body p-4">
-          <div class="row g-4 align-items-center mb-4">
-            <div class="col-auto">
-              <div class="stat-icon stat-icon-blue" style="width: 64px; height: 64px; font-size: 2rem;">
-                <i class="bi bi-person-fill"></i>
-              </div>
-            </div>
-            <div class="col">
-              <h4 class="text-white fw-bold mb-1">{{ object.name|default:object.email }}</h4>
-              <p class="text-muted small mb-0"><i class="bi bi-envelope me-1"></i>{{ object.email }}</p>
-            </div>
-          </div>
-
-          <div class="row g-3 mb-4">
-            <div class="col-sm-6">
-              <div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--spark-border);">
-                <span class="text-muted small d-block mb-1">Assigned RBAC Role</span>
-                <strong class="text-white">{{ object.get_role_display }}</strong>
-              </div>
-            </div>
-            <div class="col-sm-6">
-              <div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--spark-border);">
-                <span class="text-muted small d-block mb-1">Account Status</span>
-                <strong class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Active & Verified</strong>
-              </div>
-            </div>
-          </div>
-
-          {% if object == request.user %}
-            <hr style="border-color: var(--spark-border);" class="my-4">
-            <h6 class="text-white fw-semibold mb-3"><i class="bi bi-gear-fill me-2 text-primary"></i>Account Management Actions</h6>
-            <div class="d-flex flex-wrap gap-2">
-              <a class="spark-btn-secondary" href="{% url 'users:update' %}">
-                <i class="bi bi-pencil-square me-1"></i>Edit Profile Info
-              </a>
-              <a class="spark-btn-secondary" href="{% url 'account_email' %}">
-                <i class="bi bi-envelope-at me-1"></i>Manage E-Mail
-              </a>
-              <a class="spark-btn-secondary" href="{% url 'account_change_password' %}">
-                <i class="bi bi-key me-1"></i>Change Password
-              </a>
-              <a class="spark-btn-secondary" href="{% url 'home' %}">
-                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
-              </a>
-            </div>
-          {% endif %}
-        </div>
-      </div>
+  <div class="container">
+    <div class="row">
+      <div class="col-sm-12">
+        <h2>
+        
+        
+          {{ object.name }}
+        
+      </h2>
     </div>
   </div>
+  {% if object == request.user %}
+    <!-- Action buttons -->
+    <div class="row">
+      <div class="col-sm-12">
+        <a class="btn btn-primary" href="{% url 'users:update' %}" role="button">My Info</a>
+        <a class="btn btn-primary"
+           href="{% url 'account_email' %}"
+           role="button">E-Mail</a>
+        <a class="btn btn-primary"
+           href="{% url 'mfa_index' %}"
+           role="button">MFA</a>
+        <!-- Your Stuff: Custom user template urls -->
+      </div>
+    </div>
+    <!-- End Action buttons -->
+  {% endif %}
 </div>
 {% endblock content %}

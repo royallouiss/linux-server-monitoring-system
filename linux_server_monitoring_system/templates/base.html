@@ -1,3 +1,4 @@
+
 {% load static i18n %}<!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 <html lang="{{ LANGUAGE_CODE }}">
@@ -6,199 +7,135 @@
     <meta http-equiv="x-ua-compatible" content="ie=edge" />
     <title>
       {% block title %}
-        Linux Server Monitoring & Management System
-      {% endblock title %}
-    </title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description"
-          content="A web-based platform for monitoring Linux servers using SSH, providing real-time system metrics, server management, and centralized monitoring." />
-    <meta name="author" content="Royal Louis" />
-    <link rel="icon" href="{% static 'images/favicons/favicon.ico' %}" />
+      Linux Server Monitoring & Management System
+    {% endblock title %}
+  </title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+        content="A web-based platform for monitoring Linux servers using SSH, providing real-time system metrics, server management, and centralized monitoring." />
+  <meta name="author"
+        content="Royal Louis" />
+  <link rel="icon" href="{% static 'images/favicons/favicon.ico' %}" />
+  {% block css %}
+    <!-- Latest compiled and minified Bootstrap CSS -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/css/bootstrap.min.css"
+          integrity="sha512-SbiR/eusphKoMVVXysTKG/7VseWii+Y3FdHrt0EpKgpToZeemhqHeZeLWLhJutz/2ut2Vw1uQEj2MbRF+TVBUA=="
+          crossorigin="anonymous"
+          referrerpolicy="no-referrer" />
+<!-- Your stuff: Third-party CSS libraries go here -->
+<!-- This file stores project-specific CSS -->
 
-    {% block css %}
-      <!-- Latest compiled and minified Bootstrap 5 CSS -->
-      <link rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/css/bootstrap.min.css"
-            integrity="sha512-SbiR/eusphKoMVVXysTKG/7VseWii+Y3FdHrt0EpKgpToZeemhqHeZeLWLhJutz/2ut2Vw1uQEj2MbRF+TVBUA=="
-            crossorigin="anonymous"
-            referrerpolicy="no-referrer" />
+  
+  <link href="{% static 'css/project.css' %}" rel="stylesheet" />
 
-      <!-- Bootstrap Icons -->
-      <link rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
 
-      <!-- Modern Dashboard Theme (Spark Admin Aesthetic) -->
-      <link href="{% static 'css/modern_dashboard.css' %}" rel="stylesheet" />
-      <link href="{% static 'css/project.css' %}" rel="stylesheet" />
-    {% endblock css %}
+{% endblock css %}
+<!-- Le javascript
+    ================================================== -->
+{# Placed at the top of the document so pages load faster with defer #}
+{% block javascript %}
 
-    {% block javascript %}
-      <!-- Bootstrap JS -->
-      <script defer
-              src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/js/bootstrap.bundle.min.js"
-              crossorigin="anonymous"
-              referrerpolicy="no-referrer"></script>
-      <script defer src="{% static 'js/project.js' %}"></script>
-    {% endblock javascript %}
-  </head>
 
-  <body class="spark-theme {% block bodyclass %}{% endblock bodyclass %}">
-    {% block body %}
-      <!-- Spark Modern Navbar -->
-      <nav class="navbar navbar-expand-lg spark-navbar sticky-top">
-        <div class="container-fluid px-lg-4">
-          <a class="navbar-brand" href="{% url 'home' %}">
-            <i class="bi bi-hdd-network-fill"></i>
-            <span>Linux Monitoring</span>
-            <span class="pulse-indicator" data-bs-toggle="tooltip" title="System Live"></span>
-          </a>
+<!-- Bootstrap JS -->
+<script defer
+        src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/js/bootstrap.min.js"
+        integrity="sha512-1/RvZTcCDEUjY/CypiMz+iqqtaoQfAITmNSJY17Myp4Ms5mdxPS5UV7iOfdZoxcGhzFbOm6sntTKJppjvuhg4g=="
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"></script>
+<!-- Your stuff: Third-party javascript libraries go here -->
 
-          <button class="navbar-toggler navbar-toggler-right border-0 text-white"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#sparkNavbarContent"
-                  aria-controls="sparkNavbarContent"
-                  aria-expanded="false"
-                  aria-label="Toggle navigation">
-            <i class="bi bi-list fs-3"></i>
-          </button>
 
-          <div class="collapse navbar-collapse" id="sparkNavbarContent">
-            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+<!-- place project specific Javascript in this file -->
+
+  
+  <script defer src="{% static 'js/project.js' %}"></script>
+
+
+{% endblock javascript %}
+</head>
+<body class="{% block bodyclass %}{% endblock bodyclass %}">
+  {% block body %}
+  <div class="mb-1">
+    <nav class="navbar navbar-expand-md navbar-light bg-light">
+      <div class="container-fluid">
+        <button class="navbar-toggler navbar-toggler-right"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <a class="navbar-brand" href="{% url 'home' %}">Linux Server Monitoring & Management System</a>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav mr-auto">
+            <li class="nav-item active">
+              <a class="nav-link" href="{% url 'home' %}">Home <span class="visually-hidden">(current)</span></a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'about' %}">About</a>
+            </li>
+            {% if request.user.is_authenticated %}
               <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
-                   href="{% url 'home' %}">
-                  <i class="bi bi-speedometer2 me-1"></i>{% translate "Dashboard" %}
-                </a>
+                <a class="nav-link"
+                   href="{% url 'users:detail' request.user.pk %}">{% translate "My Profile" %}</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'servers_scaffold' %}active{% endif %}"
-                   href="{% url 'servers_scaffold' %}">
-                  <i class="bi bi-server me-1"></i>{% translate "Servers" %}
-                </a>
+                {# URL provided by django-allauth/account/urls.py #}
+                <a class="nav-link" href="{% url 'account_logout' %}">{% translate "Sign Out" %}</a>
               </li>
-              <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'alerts_scaffold' %}active{% endif %}"
-                   href="{% url 'alerts_scaffold' %}">
-                  <i class="bi bi-bell me-1"></i>{% translate "Alerts" %}
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'about' %}active{% endif %}"
-                   href="{% url 'about' %}">
-                  <i class="bi bi-info-circle me-1"></i>{% translate "About" %}
-                </a>
-              </li>
-            </ul>
-
-            <ul class="navbar-nav ms-auto align-items-lg-center gap-2">
-              {% if request.user.is_authenticated %}
-                <!-- Active RBAC Role Badge -->
+            {% else %}
+              {% if ACCOUNT_ALLOW_REGISTRATION %}
                 <li class="nav-item">
-                  {% if request.user.is_admin_role %}
-                    <span class="badge-role-admin" title="Full System Administrator Privileges">
-                      <i class="bi bi-shield-shaded me-1"></i>ADMIN
-                    </span>
-                  {% elif request.user.is_operator_role %}
-                    <span class="badge-role-operator" title="Operational Server & Monitoring Privileges">
-                      <i class="bi bi-gear-fill me-1"></i>OPERATOR
-                    </span>
-                  {% else %}
-                    <span class="badge-role-viewer" title="Read-Only Telemetry Viewer">
-                      <i class="bi bi-eye-fill me-1"></i>VIEWER
-                    </span>
-                  {% endif %}
+                  {# URL provided by django-allauth/account/urls.py #}
+                  <a id="sign-up-link" class="nav-link" href="{% url 'account_signup' %}">{% translate "Sign Up" %}</a>
                 </li>
-
-                <!-- User Profile Link -->
-                <li class="nav-item">
-                  <a class="nav-link text-white d-flex align-items-center gap-1"
-                     href="{% url 'users:detail' request.user.pk %}">
-                    <i class="bi bi-person-circle"></i>
-                    <span>{{ request.user.email }}</span>
-                  </a>
-                </li>
-
-                <!-- Sign Out -->
-                <li class="nav-item">
-                  <a class="nav-link text-danger d-flex align-items-center gap-1"
-                     href="{% url 'account_logout' %}"
-                     title="Sign Out">
-                    <i class="bi bi-box-arrow-right"></i>
-                    <span>{% translate "Sign Out" %}</span>
-                  </a>
-                </li>
-              {% else %}
-                <!-- Guest Actions -->
-                <li class="nav-item">
-                  <a id="log-in-link"
-                     class="spark-btn-secondary"
-                     href="{% url 'account_login' %}">
-                    <i class="bi bi-box-arrow-in-right me-1"></i>{% translate "Sign In" %}
-                  </a>
-                </li>
-                {% if ACCOUNT_ALLOW_REGISTRATION %}
-                  <li class="nav-item">
-                    <a id="sign-up-link"
-                       class="spark-btn-primary"
-                       href="{% url 'account_signup' %}">
-                      <i class="bi bi-person-plus-fill me-1"></i>{% translate "Sign Up" %}
-                    </a>
-                  </li>
-                {% endif %}
               {% endif %}
-            </ul>
-          </div>
+              <li class="nav-item">
+                {# URL provided by django-allauth/account/urls.py #}
+                <a id="log-in-link" class="nav-link" href="{% url 'account_login' %}">{% translate "Sign In" %}</a>
+              </li>
+            {% endif %}
+          </ul>
         </div>
-      </nav>
-
-      <!-- Main Layout Container -->
-      <main class="flex-grow-1 py-4">
-        <div class="container-fluid px-lg-4">
-          {% if messages %}
-            <div class="row justify-content-center">
-              <div class="col-12">
-                {% for message in messages %}
-                  <div class="alert alert-dismissible fade show spark-card border-primary text-white mb-3 {% if message.tags %}alert-{{ message.tags }}{% endif %}" role="alert">
-                    <div class="d-flex align-items-center">
-                      <i class="bi bi-bell-fill me-2 text-primary"></i>
-                      <div>{{ message }}</div>
-                    </div>
-                    <button type="button"
-                            class="btn-close btn-close-white"
-                            data-bs-dismiss="alert"
-                            aria-label="Close"></button>
-                  </div>
-                {% endfor %}
-              </div>
-            </div>
-          {% endif %}
-
-          {% block main %}
-            {% block content %}
-            {% endblock content %}
-          {% endblock main %}
+      </div>
+    </nav>
+  </div>
+  <div class="container">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-dismissible {% if message.tags %}alert-{{ message.tags }}{% endif %}">
+          {{ message }}
+          <button type="button"
+                  class="btn-close"
+                  data-bs-dismiss="alert"
+                  aria-label="Close"></button>
         </div>
-      </main>
+      {% endfor %}
+    {% endif %}
+    {% block main %}
+      {% block content %}
+        <p>Use this document as a way to quick start any new project.</p>
+      {% endblock content %}
+    {% endblock main %}
 
-      <!-- Modern Footer -->
-      <footer class="spark-footer text-center">
-        <div class="container-fluid px-lg-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <div>
-            <i class="bi bi-terminal-fill text-primary me-1"></i>
-            <strong>Linux Server Monitoring System</strong> &bull; Member 4 Enterprise Stack
-          </div>
-          <div>
-            <span class="badge bg-secondary bg-opacity-25 text-muted">SSH &bull; PostgreSQL &bull; RBAC &bull; Bootstrap 5</span>
-          </div>
-        </div>
-      </footer>
-    {% endblock body %}
-
-    {% block modal %}
-    {% endblock modal %}
-
-    {% block inline_javascript %}
-    {% endblock inline_javascript %}
-  </body>
+  </div>
+  {% endblock body %}
+  <!-- /container -->
+  {% block modal %}
+  {% endblock modal %}
+  {% block inline_javascript %}
+    {% comment %}
+    Script tags with only code, no src (defer by default). To run
+    with a "defer" so that you run inline code:
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        /* Run whatever you want */
+      });
+    </script>
+    {% endcomment %}
+  {% endblock inline_javascript %}
+</body>
 </html>
