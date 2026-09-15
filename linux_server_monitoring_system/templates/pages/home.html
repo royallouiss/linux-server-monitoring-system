@@ -2,7 +2,7 @@
 {% load static i18n %}
 
 {% block title %}
-  Fleet Dashboard - Linux Server Monitoring System
+  Infrastructure Command Center - Linux Server Monitoring System
 {% endblock title %}
 
 {% block bodyclass %}dashboard-body{% endblock bodyclass %}
@@ -19,28 +19,44 @@
       <div>
         <span>Linux Monitor</span>
         <div style="font-size: 0.65rem; color: var(--dash-text-muted); font-weight: normal; margin-top: -3px;">
-          Enterprise Telemetry
+          Command Center
         </div>
       </div>
     </a>
 
     <nav class="dash-nav">
       <div class="dash-nav-header">Observability</div>
-      <a href="#section-overview" class="dash-nav-link active">
-        <i class="bi bi-grid-1x2-fill"></i>
-        <span>Overview</span>
+      <a href="#section-command-bar" class="dash-nav-link active">
+        <i class="bi bi-speedometer2"></i>
+        <span>Command Center</span>
       </a>
-      <a href="#section-servers" class="dash-nav-link">
-        <i class="bi bi-server"></i>
-        <span>Server Fleet</span>
+      <a href="#section-matrix" class="dash-nav-link">
+        <i class="bi bi-grid-3x3-gap-fill"></i>
+        <span>Server Matrix</span>
       </a>
-      <a href="#section-metrics" class="dash-nav-link">
+      <a href="#section-resources" class="dash-nav-link">
         <i class="bi bi-activity"></i>
-        <span>Resource Metrics</span>
+        <span>Resource Health</span>
       </a>
-      <a href="#section-alerts" class="dash-nav-link">
+      <a href="#section-heatmap" class="dash-nav-link">
+        <i class="bi bi-cpu-fill"></i>
+        <span>Resource Heatmap</span>
+      </a>
+      <a href="#section-alerts-tasks" class="dash-nav-link">
         <i class="bi bi-shield-exclamation"></i>
-        <span>Alerts & Events</span>
+        <span>Alerts & Tasks</span>
+      </a>
+      <a href="#section-engine" class="dash-nav-link">
+        <i class="bi bi-gear-wide-connected"></i>
+        <span>Monitoring Engine</span>
+      </a>
+      <a href="#section-historical" class="dash-nav-link">
+        <i class="bi bi-graph-up"></i>
+        <span>Historical Metrics</span>
+      </a>
+      <a href="#section-activity" class="dash-nav-link">
+        <i class="bi bi-clock-history"></i>
+        <span>Recent Activity</span>
       </a>
 
       <div class="dash-nav-header mt-3">Administration</div>
@@ -53,11 +69,11 @@
     <div class="dash-sidebar-footer">
       <div class="fleet-health-pill">
         <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="text-muted" style="font-size: 0.72rem;">FLEET HEALTH</span>
-          <span class="status-dot online"></span>
+          <span class="text-muted" style="font-size: 0.72rem;">SYSTEM HEALTH</span>
+          <span class="status-dot online" id="sidebar-status-dot"></span>
         </div>
         <div class="fw-bold" id="sidebar-fleet-status">All Systems Healthy</div>
-        <div class="text-muted" style="font-size: 0.72rem;" id="sidebar-server-count">Monitoring 1 Server</div>
+        <div class="text-muted" style="font-size: 0.72rem;" id="sidebar-server-count">Monitoring Fleet</div>
       </div>
     </div>
   </aside>
@@ -65,7 +81,7 @@
   <!-- ================= MAIN VIEW ================= -->
   <div class="dash-main">
 
-    <!-- Top Header -->
+    <!-- Top Navigation Header -->
     <header class="dash-header">
       <div class="dash-header-left">
         <button class="btn btn-sm btn-outline-secondary d-lg-none" id="sidebar-toggle" aria-label="Toggle navigation">
@@ -73,48 +89,22 @@
         </button>
         <div>
           <span class="env-badge me-2">Production</span>
-          <span class="fw-bold fs-6 d-none d-sm-inline">Linux Fleet Monitoring</span>
+          <span class="fw-bold fs-6 d-none d-sm-inline">Linux Infrastructure Command Center</span>
         </div>
       </div>
 
       <div class="dash-header-right">
-        <!-- Live status -->
-        <div class="live-indicator d-none d-md-flex">
-          <span class="status-dot online"></span>
-          <span>Live Telemetry</span>
-        </div>
-
-        <!-- 30s Countdown Ticker Badge -->
-        <div class="countdown-badge d-none d-sm-flex align-items-center" id="refresh-countdown-badge" title="Auto-refresh countdown">
+        <!-- Exact 10s Countdown Ticker Badge -->
+        <div class="countdown-badge d-flex align-items-center" id="refresh-countdown-badge" title="Auto-refresh countdown">
           <i class="bi bi-stopwatch text-primary me-1"></i>
-          <span>Next poll: <strong id="refresh-countdown-sec">30</strong>s</span>
-        </div>
-
-        <!-- Auto-refresh interval dropdown -->
-        <div class="dropdown">
-          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="auto-refresh-menu" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-clock-history me-1"></i>
-            <span id="auto-refresh-label">Refresh: 30s</span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="auto-refresh-menu">
-            <li><button class="dropdown-item" data-interval="15000">Every 15 seconds</button></li>
-            <li><button class="dropdown-item active-refresh" data-interval="30000">Every 30 seconds</button></li>
-            <li><button class="dropdown-item" data-interval="60000">Every 60 seconds</button></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><button class="dropdown-item text-danger" data-interval="0">Pause Auto-refresh</button></li>
-          </ul>
+          <span>Auto-refresh: <strong id="refresh-countdown-sec">10</strong>s</span>
         </div>
 
         <!-- Manual Refresh Button -->
         <button class="btn btn-sm btn-primary d-flex align-items-center gap-1" id="btn-refresh-all" title="Trigger immediate refresh">
           <i class="bi bi-arrow-clockwise" id="refresh-icon"></i>
-          <span class="d-none d-sm-inline">Refresh</span>
+          <span class="d-none d-sm-inline fw-semibold">Refresh Now</span>
         </button>
-
-        <!-- Last Updated -->
-        <span class="text-muted d-none d-xl-inline" style="font-size: 0.8rem;">
-          Updated: <span id="last-updated-time" class="fw-medium text-light font-monospace">--:--:--</span>
-        </span>
 
         <!-- Theme Toggle -->
         <button class="btn btn-sm btn-outline-secondary" id="btn-theme-toggle" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
@@ -141,45 +131,70 @@
       </div>
     </header>
 
-    <!-- Main Content Stream -->
-    <main class="dash-content">
+    <!-- Main Content Body -->
+    <main class="dash-content px-3 py-3 px-lg-4">
 
       <!-- Global Error / Retry Banner -->
-      <div id="dash-error-banner" class="alert alert-danger alert-dismissible fade show d-none" role="alert">
-        <div class="d-flex align-items-center justify-content-between">
+      <div id="dash-error-banner" class="alert alert-danger alert-dismissible fade show d-none mb-3" role="alert">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
           <div>
             <i class="bi bi-exclamation-triangle-fill me-2"></i>
-            <span id="dash-error-message">Unable to contact the monitoring backend API.</span>
+            <span id="dash-error-message">Unable to contact the monitoring backend API. Using cached telemetry.</span>
           </div>
-          <button type="button" class="btn btn-sm btn-danger ms-3" id="btn-error-retry">Retry Connection</button>
+          <button type="button" class="btn btn-sm btn-danger" id="btn-error-retry">Retry Connection</button>
         </div>
       </div>
 
-      <!-- ================= LIVE 30s REFRESH RESULT BANNER ================= -->
-      <div id="live-refresh-bar" class="live-refresh-bar">
-        <div class="d-flex align-items-center gap-2 flex-wrap flex-grow-1">
-          <div class="d-flex align-items-center gap-2">
-            <span class="status-dot online" id="live-refresh-dot"></span>
-            <span class="fw-bold fs-7 text-light">30s Telemetry Poll:</span>
-            <span class="text-secondary small font-monospace" id="live-refresh-time">--:--:--</span>
+      <!-- ================= LEVEL 1: TOP SYSTEM HEALTH COMMAND BAR (PHASE 3) ================= -->
+      <section id="section-command-bar" class="system-command-bar">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <div class="system-title-group">
+            <h1>Linux Server Monitoring</h1>
+            <div class="system-subtitle">Infrastructure Health &bull; Fleet Command Center</div>
           </div>
-          <span class="vr mx-2 d-none d-md-inline" style="opacity: 0.25;"></span>
-          <div class="live-refresh-metrics d-flex align-items-center gap-2 flex-wrap" id="live-refresh-metrics">
-            <span class="badge bg-secondary font-monospace">Synchronizing telemetry...</span>
+          <div class="vr mx-1 d-none d-md-inline" style="opacity: 0.25; height: 36px;"></div>
+          <!-- Overall System Status Indicator -->
+          <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small text-uppercase fw-semibold d-none d-sm-inline">System Status:</span>
+            <div class="system-status-pill healthy" id="system-status-pill">
+              <span class="status-dot online" id="system-status-dot"></span>
+              <span id="system-status-text">HEALTHY</span>
+            </div>
           </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge badge-soft-success font-monospace" id="live-refresh-status-badge">
-            <i class="bi bi-check-circle-fill me-1"></i> 200 OK
+
+        <!-- Infrastructure Summary Counters -->
+        <div class="system-counters">
+          <span class="counter-chip"><strong id="stat-total-chip">0</strong> Total</span>
+          <span class="text-muted">&bull;</span>
+          <span class="counter-chip text-success"><strong id="stat-online-chip" class="text-success">0</strong> Online</span>
+          <span class="text-muted">&bull;</span>
+          <span class="counter-chip text-warning"><strong id="stat-warning-chip" class="text-warning">0</strong> Warning</span>
+          <span class="text-muted">&bull;</span>
+          <span class="counter-chip text-danger"><strong id="stat-offline-chip" class="text-danger">0</strong> Offline</span>
+          <span class="text-muted">&bull;</span>
+          <span class="counter-chip text-info"><strong id="stat-alerts-chip" class="text-info">0</strong> Active Alerts</span>
+        </div>
+
+        <!-- Auto-refresh & Last Updated Status -->
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="system-refresh-pill">
+            <span class="status-dot online"></span>
+            <span>AUTO REFRESH: <strong>ON</strong> (10s)</span>
+            <span class="text-muted">&bull;</span>
+            <span>Updated: <span id="last-updated-time" class="text-light font-monospace fw-bold">--:--:--</span></span>
+          </div>
+          <span class="badge badge-soft-success font-monospace" id="refresh-status-badge">
+            <i class="bi bi-check-circle-fill me-1"></i> Live
           </span>
         </div>
-      </div>
+      </section>
 
-      <!-- ================= SECTION 1: SUMMARY KPI CARDS ================= -->
-      <section id="section-overview">
+      <!-- ================= LEVEL 2: KPI SUMMARY CARDS (PHASE 4) ================= -->
+      <section id="section-overview" class="mb-4">
         <div class="row g-3">
           <!-- KPI 1: Total Servers -->
-          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+          <div class="col-6 col-md-4 col-xl-2">
             <div class="dash-card kpi-card">
               <div class="kpi-top">
                 <span class="kpi-label">Total Servers</span>
@@ -188,26 +203,26 @@
                 </div>
               </div>
               <div class="kpi-value" id="stat-total-servers">
-                <div class="skeleton-box" style="width: 50px; height: 38px;"></div>
+                <div class="skeleton-box" style="width: 45px; height: 34px;"></div>
               </div>
-              <div class="kpi-subtext">
+              <div class="kpi-subtext" id="stat-total-subtext">
                 <span class="badge bg-secondary">Registered</span>
-                <span>Active fleet</span>
+                <span>Monitored fleet</span>
               </div>
             </div>
           </div>
 
           <!-- KPI 2: Online Servers -->
-          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+          <div class="col-6 col-md-4 col-xl-2">
             <div class="dash-card kpi-card">
               <div class="kpi-top">
-                <span class="kpi-label">Online Servers</span>
+                <span class="kpi-label">Online</span>
                 <div class="kpi-icon-box kpi-icon-online">
                   <i class="bi bi-check-circle-fill"></i>
                 </div>
               </div>
               <div class="kpi-value text-success" id="stat-online-servers">
-                <div class="skeleton-box" style="width: 50px; height: 38px;"></div>
+                <div class="skeleton-box" style="width: 45px; height: 34px;"></div>
               </div>
               <div class="kpi-subtext" id="stat-online-subtext">
                 <span class="badge bg-success">100%</span>
@@ -216,27 +231,46 @@
             </div>
           </div>
 
-          <!-- KPI 3: Offline Servers -->
-          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+          <!-- KPI 3: Warning Servers -->
+          <div class="col-6 col-md-4 col-xl-2">
             <div class="dash-card kpi-card">
               <div class="kpi-top">
-                <span class="kpi-label">Offline Servers</span>
+                <span class="kpi-label">Warning</span>
+                <div class="kpi-icon-box kpi-icon-warning">
+                  <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+              </div>
+              <div class="kpi-value text-warning" id="stat-warning-servers">
+                0
+              </div>
+              <div class="kpi-subtext" id="stat-warning-subtext">
+                <span class="badge bg-secondary">0 Elevated</span>
+                <span>Stable</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 4: Offline Servers -->
+          <div class="col-6 col-md-4 col-xl-2">
+            <div class="dash-card kpi-card">
+              <div class="kpi-top">
+                <span class="kpi-label">Offline</span>
                 <div class="kpi-icon-box kpi-icon-offline">
                   <i class="bi bi-x-circle-fill"></i>
                 </div>
               </div>
               <div class="kpi-value text-danger" id="stat-offline-servers">
-                <div class="skeleton-box" style="width: 50px; height: 38px;"></div>
+                <div class="skeleton-box" style="width: 45px; height: 34px;"></div>
               </div>
               <div class="kpi-subtext" id="stat-offline-subtext">
                 <span class="badge bg-secondary">0 Issues</span>
-                <span>All connected</span>
+                <span>Connected</span>
               </div>
             </div>
           </div>
 
-          <!-- KPI 4: Active Alerts -->
-          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+          <!-- KPI 5: Active Alerts -->
+          <div class="col-6 col-md-4 col-xl-2">
             <div class="dash-card kpi-card">
               <div class="kpi-top">
                 <span class="kpi-label">Active Alerts</span>
@@ -245,7 +279,7 @@
                 </div>
               </div>
               <div class="kpi-value text-warning" id="stat-active-alerts">
-                <div class="skeleton-box" style="width: 50px; height: 38px;"></div>
+                <div class="skeleton-box" style="width: 45px; height: 34px;"></div>
               </div>
               <div class="kpi-subtext" id="stat-alerts-subtext">
                 <span class="badge bg-secondary">0 Critical</span>
@@ -254,88 +288,69 @@
             </div>
           </div>
 
-          <!-- KPI 5: Fleet Avg CPU (with 30s variation Δ) -->
-          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+          <!-- KPI 6: Monitoring Success Rate -->
+          <div class="col-6 col-md-4 col-xl-2">
             <div class="dash-card kpi-card">
               <div class="kpi-top">
-                <span class="kpi-label">Fleet Avg CPU</span>
-                <div class="kpi-icon-box" style="background: var(--dash-info-subtle); color: var(--dash-info);">
-                  <i class="bi bi-cpu"></i>
+                <span class="kpi-label">Success Rate</span>
+                <div class="kpi-icon-box kpi-icon-rate">
+                  <i class="bi bi-shield-check"></i>
                 </div>
               </div>
-              <div class="kpi-value text-info font-monospace" id="stat-avg-cpu">
-                0.0%
+              <div class="kpi-value text-info font-monospace" id="stat-success-rate">
+                100%
               </div>
-              <div class="kpi-subtext" id="stat-avg-cpu-subtext">
-                <span class="badge-delta badge-delta-neutral font-monospace" id="stat-avg-cpu-delta">0.00%</span>
-                <span class="small text-muted">30s Δ</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- KPI 6: Fleet Avg RAM (with 30s variation Δ) -->
-          <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
-            <div class="dash-card kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-label">Fleet Avg RAM</span>
-                <div class="kpi-icon-box" style="background: var(--dash-success-subtle); color: var(--dash-success);">
-                  <i class="bi bi-memory"></i>
-                </div>
-              </div>
-              <div class="kpi-value text-success font-monospace" id="stat-avg-memory">
-                0.0%
-              </div>
-              <div class="kpi-subtext" id="stat-avg-memory-subtext">
-                <span class="badge-delta badge-delta-neutral font-monospace" id="stat-avg-memory-delta">0.00%</span>
-                <span class="small text-muted">30s Δ</span>
+              <div class="kpi-subtext" id="stat-success-subtext">
+                <span class="badge bg-success">Optimal</span>
+                <span>Active runs</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ================= SECTION 2: SERVER FLEET HEALTH ================= -->
-      <section id="section-servers" class="dash-card">
-        <div class="dash-card-header flex-wrap gap-2">
+      <!-- ================= LEVEL 3: MAIN SERVER HEALTH MATRIX (PHASE 5, 6, 7, 8) ================= -->
+      <section id="section-matrix" class="dash-card matrix-card">
+        <div class="matrix-header">
           <div>
-            <h2 class="dash-card-title">
-              <i class="bi bi-server text-primary"></i>
-              Server Health & Status
+            <h2 class="matrix-title">
+              <i class="bi bi-grid-3x3-gap-fill text-primary"></i>
+              SERVER HEALTH MATRIX
             </h2>
-            <span class="text-muted" style="font-size: 0.8rem;">Live health telemetry collected via SSH</span>
+            <div class="matrix-subtext">Current health of all monitored servers &bull; Updated every 10 seconds</div>
           </div>
 
-          <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="matrix-controls">
             <!-- Search -->
-            <div class="server-search-box">
+            <div class="matrix-search">
               <i class="bi bi-search"></i>
-              <input type="text" class="server-search-input" id="server-search-input" placeholder="Search servers, IPs..." aria-label="Search servers">
+              <input type="text" class="matrix-search-input" id="server-search-input" placeholder="Search servers, hostnames, IPs..." aria-label="Search servers">
             </div>
 
-            <!-- Status Filter Buttons -->
+            <!-- Attention-First Filter Buttons -->
             <div class="btn-group btn-group-sm" role="group" aria-label="Filter servers by status">
               <button type="button" class="btn btn-outline-secondary active" data-server-filter="ALL">All</button>
-              <button type="button" class="btn btn-outline-secondary" data-server-filter="UP">Online</button>
+              <button type="button" class="btn btn-outline-secondary" data-server-filter="HEALTHY">Healthy</button>
+              <button type="button" class="btn btn-outline-secondary" data-server-filter="WARNING">Warning</button>
               <button type="button" class="btn btn-outline-secondary" data-server-filter="DOWN">Offline</button>
-              <button type="button" class="btn btn-outline-secondary" data-server-filter="UNKNOWN">Unknown</button>
             </div>
           </div>
         </div>
 
-        <!-- Servers Table -->
+        <!-- Servers Table Matrix -->
         <div class="dash-table-wrapper">
-          <table class="dash-table" id="servers-table">
+          <table class="dash-table align-middle" id="servers-table">
             <thead>
               <tr>
-                <th>Server & Hostname</th>
-                <th>Status</th>
-                <th>CPU Usage (30s Δ)</th>
-                <th>Memory Usage (30s Δ)</th>
-                <th>Disk Space (30s Δ)</th>
-                <th>Network Traffic (30s Δ)</th>
-                <th>Last Checked</th>
-                <th>Alerts</th>
-                <th class="text-end">Actions</th>
+                <th style="min-width: 160px;">SERVER</th>
+                <th style="min-width: 100px;">STATUS</th>
+                <th style="min-width: 130px;">CPU</th>
+                <th style="min-width: 130px;">MEMORY</th>
+                <th style="min-width: 130px;">DISK</th>
+                <th style="min-width: 120px;">NETWORK</th>
+                <th style="min-width: 100px;">LAST CHECK</th>
+                <th style="min-width: 100px;">ALERT</th>
+                <th class="text-end" style="min-width: 110px;">ACTION</th>
               </tr>
             </thead>
             <tbody id="servers-table-body">
@@ -343,8 +358,8 @@
               <tr>
                 <td colspan="9">
                   <div class="d-flex flex-column gap-2 py-3">
-                    <div class="skeleton-box" style="height: 24px; width: 100%;"></div>
-                    <div class="skeleton-box" style="height: 24px; width: 100%;"></div>
+                    <div class="skeleton-box" style="height: 28px; width: 100%;"></div>
+                    <div class="skeleton-box" style="height: 28px; width: 100%;"></div>
                   </div>
                 </td>
               </tr>
@@ -358,25 +373,283 @@
             <i class="bi bi-hdd-network text-muted"></i>
           </div>
           <h5 class="text-light">No Servers Match Your Query</h5>
-          <p class="text-muted small">Try modifying your search or clearing the status filter.</p>
+          <p class="text-muted small">Try adjusting your search keywords or resetting the status filter.</p>
           <button class="btn btn-sm btn-outline-primary" id="btn-clear-search">Reset Filters</button>
         </div>
       </section>
 
-      <!-- ================= SECTION 3: RESOURCE OVERVIEW & CHARTS ================= -->
-      <section id="section-metrics" class="dash-card">
+      <!-- ================= LEVEL 4: RESOURCE OVERVIEW & HEATMAP MATRIX (PHASE 9 & 10) ================= -->
+      <!-- Section 4A: Resource Overview Panels -->
+      <section id="section-resources" class="mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div>
+            <h3 class="fw-bold fs-6 mb-0 text-light text-uppercase">
+              <i class="bi bi-speedometer text-info me-1"></i> Resource Overview
+            </h3>
+            <span class="text-muted small">Fleet-wide compute, memory, disk, and network health</span>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <!-- Resource 1: CPU -->
+          <div class="col-12 col-sm-6 col-xl-3">
+            <div class="resource-overview-panel">
+              <div class="resource-panel-header">
+                <span class="resource-panel-title"><i class="bi bi-cpu text-primary me-1"></i> CPU Health</span>
+                <span class="badge badge-soft-success" id="overview-cpu-status">Healthy</span>
+              </div>
+              <div>
+                <div class="resource-panel-value text-primary" id="overview-cpu-val">0.0%</div>
+                <div class="d-flex align-items-center gap-1 small">
+                  <span class="badge-delta badge-delta-neutral font-monospace" id="overview-cpu-delta">0.00%</span>
+                  <span class="text-muted" style="font-size: 0.72rem;">from previous check</span>
+                </div>
+              </div>
+              <div class="sparkline-box">
+                <canvas id="sparkline-cpu"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resource 2: Memory -->
+          <div class="col-12 col-sm-6 col-xl-3">
+            <div class="resource-overview-panel">
+              <div class="resource-panel-header">
+                <span class="resource-panel-title"><i class="bi bi-memory text-success me-1"></i> Memory Health</span>
+                <span class="badge badge-soft-success" id="overview-mem-status">Healthy</span>
+              </div>
+              <div>
+                <div class="resource-panel-value text-success" id="overview-mem-val">0.0%</div>
+                <div class="d-flex align-items-center gap-1 small">
+                  <span class="badge-delta badge-delta-neutral font-monospace" id="overview-mem-delta">0.00%</span>
+                  <span class="text-muted" style="font-size: 0.72rem;">from previous check</span>
+                </div>
+              </div>
+              <div class="sparkline-box">
+                <canvas id="sparkline-memory"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resource 3: Disk -->
+          <div class="col-12 col-sm-6 col-xl-3">
+            <div class="resource-overview-panel">
+              <div class="resource-panel-header">
+                <span class="resource-panel-title"><i class="bi bi-disc text-warning me-1"></i> Disk Health</span>
+                <span class="badge badge-soft-success" id="overview-disk-status">Healthy</span>
+              </div>
+              <div>
+                <div class="resource-panel-value text-warning" id="overview-disk-val">0.0%</div>
+                <div class="d-flex align-items-center gap-1 small">
+                  <span class="badge-delta badge-delta-neutral font-monospace" id="overview-disk-delta">0.00%</span>
+                  <span class="text-muted" style="font-size: 0.72rem;">root mount /</span>
+                </div>
+              </div>
+              <div class="sparkline-box">
+                <canvas id="sparkline-disk"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resource 4: Network -->
+          <div class="col-12 col-sm-6 col-xl-3">
+            <div class="resource-overview-panel">
+              <div class="resource-panel-header">
+                <span class="resource-panel-title"><i class="bi bi-arrow-down-up text-info me-1"></i> Network Health</span>
+                <span class="badge badge-soft-info" id="overview-net-status">Good</span>
+              </div>
+              <div>
+                <div class="resource-panel-value text-info fs-5 mt-1" id="overview-net-val">
+                  <div class="font-monospace">↓ 0.0 KB/s</div>
+                  <div class="font-monospace text-muted fs-6">↑ 0.0 KB/s</div>
+                </div>
+                <div class="d-flex align-items-center gap-1 small mt-1">
+                  <span class="badge-delta badge-delta-neutral font-monospace" id="overview-net-delta">0.00 KB/s</span>
+                  <span class="text-muted" style="font-size: 0.72rem;">throughput variation</span>
+                </div>
+              </div>
+              <div class="sparkline-box">
+                <canvas id="sparkline-network"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4B: Resource Health Matrix / Heatmap (Phase 10) -->
+      <section id="section-heatmap" class="dash-card heatmap-card">
+        <div class="dash-card-header flex-wrap gap-2">
+          <div>
+            <h2 class="dash-card-title">
+              <i class="bi bi-grid-fill text-warning"></i>
+              RESOURCE HEALTH MATRIX
+            </h2>
+            <span class="text-muted" style="font-size: 0.8rem;">Infrastructure comparison across compute, memory, storage, and network interfaces</span>
+          </div>
+          <span class="badge badge-soft-info font-monospace">Quick Infrastructure Comparison</span>
+        </div>
+
+        <div class="dash-table-wrapper">
+          <table class="dash-table align-middle" id="heatmap-table">
+            <thead>
+              <tr>
+                <th style="min-width: 180px;">SERVER</th>
+                <th class="text-center" style="min-width: 100px;">CPU</th>
+                <th class="text-center" style="min-width: 100px;">MEMORY</th>
+                <th class="text-center" style="min-width: 100px;">DISK</th>
+                <th class="text-center" style="min-width: 100px;">NETWORK</th>
+              </tr>
+            </thead>
+            <tbody id="heatmap-table-body">
+              <tr>
+                <td colspan="5" class="text-center text-muted py-3">Loading infrastructure heatmap...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================= LEVEL 5: ALERTS + OPERATIONAL TASKS (PHASE 11 & 12) ================= -->
+      <section id="section-alerts-tasks" class="mb-4">
+        <div class="row g-3">
+          <!-- Panel 1: Alert Center (Phase 11) -->
+          <div class="col-12 col-lg-6">
+            <div class="dash-card h-100">
+              <div class="dash-card-header flex-wrap gap-2">
+                <div>
+                  <h2 class="dash-card-title">
+                    <i class="bi bi-shield-exclamation text-danger"></i>
+                    ALERT CENTER
+                  </h2>
+                  <span class="text-muted" style="font-size: 0.8rem;">System alerts triggered by thresholds & connectivity</span>
+                </div>
+
+                <div class="btn-group btn-group-sm" role="group" aria-label="Filter alerts">
+                  <button type="button" class="btn btn-outline-secondary active" data-alert-filter="ACTIVE">Active</button>
+                  <button type="button" class="btn btn-outline-secondary" data-alert-filter="CRITICAL">Critical</button>
+                  <button type="button" class="btn btn-outline-secondary" data-alert-filter="WARNING">Warning</button>
+                  <button type="button" class="btn btn-outline-secondary" data-alert-filter="RESOLVED">Resolved</button>
+                  <button type="button" class="btn btn-outline-secondary" data-alert-filter="ALL">All</button>
+                </div>
+              </div>
+
+              <div id="alerts-list-container" class="d-flex flex-column gap-2" style="max-height: 380px; overflow-y: auto;">
+                <!-- Injected dynamically via dashboard.js -->
+              </div>
+
+              <div id="alerts-empty-state" class="empty-state-box">
+                <div class="empty-state-icon">
+                  <i class="bi bi-shield-check text-success"></i>
+                </div>
+                <h5 class="text-light">All Clear &bull; No Active Alerts</h5>
+                <p class="text-muted small mb-0">Infrastructure operating within established thresholds.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel 2: Action Center / Tasks & Attention (Phase 12) -->
+          <div class="col-12 col-lg-6">
+            <div class="dash-card h-100">
+              <div class="dash-card-header flex-wrap gap-2">
+                <div>
+                  <h2 class="dash-card-title">
+                    <i class="bi bi-check2-square text-info"></i>
+                    ACTION CENTER &bull; OPERATIONAL TASKS
+                  </h2>
+                  <span class="text-muted" style="font-size: 0.8rem;">Action recommendations derived from real operational status</span>
+                </div>
+                <span class="badge badge-soft-info font-monospace">Attention First</span>
+              </div>
+
+              <div id="action-tasks-container" class="action-center-container" style="max-height: 380px; overflow-y: auto;">
+                <!-- Injected dynamically via dashboard.js -->
+                <div class="p-3 text-center text-muted">
+                  <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                  Evaluating infrastructure tasks...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= LEVEL 6: MONITORING ENGINE STATUS (PHASE 15) ================= -->
+      <section id="section-engine" class="dash-card mb-4">
+        <div class="dash-card-header flex-wrap gap-2">
+          <div>
+            <h2 class="dash-card-title">
+              <i class="bi bi-gear-wide-connected text-primary"></i>
+              MONITORING SYSTEM STATUS
+            </h2>
+            <span class="text-muted" style="font-size: 0.8rem;">Telemetry service, background schedulers, and execution lifecycle</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge badge-soft-success font-monospace" id="engine-overall-badge">
+              <span class="status-dot online me-1"></span> Engine Healthy
+            </span>
+          </div>
+        </div>
+
+        <div class="engine-status-grid">
+          <div class="engine-item">
+            <div class="engine-label">Monitoring Service</div>
+            <div class="engine-value text-success" id="engine-service-status">
+              <span class="status-dot online"></span> Running
+            </div>
+          </div>
+          <div class="engine-item">
+            <div class="engine-label">Scheduler</div>
+            <div class="engine-value text-success" id="engine-scheduler-status">
+              <span class="status-dot online"></span> Active
+            </div>
+          </div>
+          <div class="engine-item">
+            <div class="engine-label">Runner</div>
+            <div class="engine-value text-success" id="engine-runner-status">
+              <span class="status-dot online"></span> Healthy
+            </div>
+          </div>
+          <div class="engine-item">
+            <div class="engine-label">Last Successful Run</div>
+            <div class="engine-value font-monospace small" id="engine-last-success">
+              --:--:--
+            </div>
+          </div>
+          <div class="engine-item">
+            <div class="engine-label">Last Failed Run</div>
+            <div class="engine-value font-monospace small text-muted" id="engine-last-fail">
+              None
+            </div>
+          </div>
+          <div class="engine-item">
+            <div class="engine-label">Last Fleet Check</div>
+            <div class="engine-value font-monospace small" id="engine-last-check">
+              --:--:--
+            </div>
+          </div>
+          <div class="engine-item">
+            <div class="engine-label">Next Refresh Poll</div>
+            <div class="engine-value font-monospace text-primary" id="engine-next-refresh">
+              10s
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= LEVEL 7: HISTORICAL METRICS (PHASE 14) ================= -->
+      <section id="section-historical" class="dash-card mb-4">
         <div class="dash-card-header flex-wrap gap-2">
           <div>
             <h2 class="dash-card-title">
               <i class="bi bi-graph-up text-info"></i>
-              Resource Telemetry & Trends
+              HISTORICAL METRICS & TRENDS
             </h2>
-            <span class="text-muted" style="font-size: 0.8rem;">Historical CPU, Memory, Disk, and Network samples</span>
+            <span class="text-muted" style="font-size: 0.8rem;">Real time-series telemetry with Current, Average, and Peak analytics</span>
           </div>
 
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <!-- Server Selector -->
-            <select class="form-select form-select-sm" id="chart-server-select" style="max-width: 220px; background-color: var(--dash-bg); color: var(--dash-text-primary); border-color: var(--dash-border);" aria-label="Select server for charts">
+            <select class="form-select form-select-sm" id="chart-server-select" style="max-width: 200px; background-color: var(--dash-bg); color: var(--dash-text-primary); border-color: var(--dash-border);" aria-label="Select server for charts">
               <option value="">Loading servers...</option>
             </select>
 
@@ -387,19 +660,45 @@
               <button type="button" class="btn btn-outline-secondary active" data-range="24h">24h</button>
               <button type="button" class="btn btn-outline-secondary" data-range="7d">7d</button>
             </div>
+
+            <!-- Chart Model Selector (Zigzag / Smooth / Stepped) -->
+            <div class="btn-group btn-group-sm" role="group" id="chart-model-group" aria-label="Chart interpolation model">
+              <button type="button" class="btn btn-outline-secondary active" data-chart-model="zigzag" title="Zigzag: Sharp point-to-point straight lines">
+                <i class="bi bi-activity me-1 text-primary"></i>Zigzag
+              </button>
+              <button type="button" class="btn btn-outline-secondary" data-chart-model="smooth" title="Smooth: Bezier curved splines">
+                <i class="bi bi-bezier2 me-1"></i>Smooth
+              </button>
+              <button type="button" class="btn btn-outline-secondary" data-chart-model="stepped" title="Stepped: Digital staircase steps">
+                <i class="bi bi-bar-chart-steps me-1"></i>Stepped
+              </button>
+            </div>
+
+            <!-- Y-Axis Scaling Mode Toggle -->
+            <button type="button" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 active-dynamic" id="btn-chart-scale-toggle" title="Toggle between Dynamic Scale (zoomed into variations) and Full Scale (0-100%)">
+              <i class="bi bi-arrows-expand text-info" id="chart-scale-icon"></i>
+              <span id="chart-scale-label">Dynamic Scale</span>
+            </button>
+
+            <!-- Quick Collect Sample Button -->
+            <button type="button" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" id="btn-chart-collect-sample" title="Collect a fresh metric sample from this server now">
+              <i class="bi bi-arrow-repeat" id="chart-collect-icon"></i>
+              <span class="d-none d-xl-inline">Sample Now</span>
+            </button>
           </div>
         </div>
 
-        <!-- 4 Grid Charts -->
+        <!-- 4 Line Charts -->
         <div class="row g-3">
           <!-- Chart 1: CPU -->
           <div class="col-12 col-lg-6">
             <div class="dash-card chart-card">
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
                 <span class="fw-bold small text-light"><i class="bi bi-cpu me-1 text-primary"></i> CPU Utilization (%)</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span class="badge badge-soft-info font-monospace" id="current-cpu-badge">0.0%</span>
-                  <span class="badge-delta badge-delta-neutral font-monospace" id="delta-cpu-badge" title="30-second variation (Δ)">0.00%</span>
+                <div class="d-flex align-items-center gap-1 flex-wrap">
+                  <span class="stat-metric-badge" id="stat-cpu-current">Cur: <strong>0.0%</strong></span>
+                  <span class="stat-metric-badge" id="stat-cpu-avg">Avg: <strong>0.0%</strong></span>
+                  <span class="stat-metric-badge" id="stat-cpu-peak">Peak: <strong>0.0%</strong></span>
                 </div>
               </div>
               <div class="chart-canvas-container">
@@ -411,11 +710,12 @@
           <!-- Chart 2: Memory -->
           <div class="col-12 col-lg-6">
             <div class="dash-card chart-card">
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
                 <span class="fw-bold small text-light"><i class="bi bi-memory me-1 text-success"></i> Memory Usage (%)</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span class="badge badge-soft-success font-monospace" id="current-mem-badge">0.0%</span>
-                  <span class="badge-delta badge-delta-neutral font-monospace" id="delta-mem-badge" title="30-second variation (Δ)">0.00%</span>
+                <div class="d-flex align-items-center gap-1 flex-wrap">
+                  <span class="stat-metric-badge" id="stat-mem-current">Cur: <strong>0.0%</strong></span>
+                  <span class="stat-metric-badge" id="stat-mem-avg">Avg: <strong>0.0%</strong></span>
+                  <span class="stat-metric-badge" id="stat-mem-peak">Peak: <strong>0.0%</strong></span>
                 </div>
               </div>
               <div class="chart-canvas-container">
@@ -427,11 +727,12 @@
           <!-- Chart 3: Disk -->
           <div class="col-12 col-lg-6">
             <div class="dash-card chart-card">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="fw-bold small text-light"><i class="bi bi-disc me-1 text-warning"></i> Disk Storage (/)</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span class="badge badge-soft-warning font-monospace" id="current-disk-badge">0.0%</span>
-                  <span class="badge-delta badge-delta-neutral font-monospace" id="delta-disk-badge" title="30-second variation (Δ)">0.00%</span>
+              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
+                <span class="fw-bold small text-light"><i class="bi bi-disc me-1 text-warning"></i> Disk Space (/)</span>
+                <div class="d-flex align-items-center gap-1 flex-wrap">
+                  <span class="stat-metric-badge" id="stat-disk-current">Cur: <strong>0.0%</strong></span>
+                  <span class="stat-metric-badge" id="stat-disk-avg">Avg: <strong>0.0%</strong></span>
+                  <span class="stat-metric-badge" id="stat-disk-peak">Peak: <strong>0.0%</strong></span>
                 </div>
               </div>
               <div class="chart-canvas-container">
@@ -443,11 +744,12 @@
           <!-- Chart 4: Network -->
           <div class="col-12 col-lg-6">
             <div class="dash-card chart-card">
-              <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-1">
                 <span class="fw-bold small text-light"><i class="bi bi-arrow-down-up me-1 text-info"></i> Network Traffic (KB/s)</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span class="badge badge-soft-info font-monospace" id="current-net-badge">0.0 KB/s</span>
-                  <span class="badge-delta badge-delta-neutral font-monospace" id="delta-net-badge" title="30-second variation (Δ)">0.00 KB/s</span>
+                <div class="d-flex align-items-center gap-1 flex-wrap">
+                  <span class="stat-metric-badge" id="stat-net-current">Cur: <strong>0.0 KB/s</strong></span>
+                  <span class="stat-metric-badge" id="stat-net-avg">Avg: <strong>0.0 KB/s</strong></span>
+                  <span class="stat-metric-badge" id="stat-net-peak">Peak: <strong>0.0 KB/s</strong></span>
                 </div>
               </div>
               <div class="chart-canvas-container">
@@ -458,64 +760,31 @@
         </div>
       </section>
 
-      <!-- ================= SECTION 4: ALERTS & INCIDENTS ================= -->
-      <section id="section-alerts" class="dash-card">
-        <div class="dash-card-header flex-wrap gap-2">
-          <div>
-            <h2 class="dash-card-title">
-              <i class="bi bi-shield-exclamation text-warning"></i>
-              Alerts & Incident Feed
-            </h2>
-            <span class="text-muted" style="font-size: 0.8rem;">System alerts triggered by thresholds and connection status</span>
-          </div>
-
-          <div class="btn-group btn-group-sm" role="group" aria-label="Filter alerts">
-            <button type="button" class="btn btn-outline-secondary active" data-alert-filter="ACTIVE">Active</button>
-            <button type="button" class="btn btn-outline-secondary" data-alert-filter="CRITICAL">Critical</button>
-            <button type="button" class="btn btn-outline-secondary" data-alert-filter="WARNING">Warning</button>
-            <button type="button" class="btn btn-outline-secondary" data-alert-filter="RESOLVED">Resolved</button>
-            <button type="button" class="btn btn-outline-secondary" data-alert-filter="ALL">All</button>
-          </div>
-        </div>
-
-        <div id="alerts-list-container" class="d-flex flex-column gap-2">
-          <!-- Injected dynamically via dashboard.js -->
-        </div>
-
-        <div id="alerts-empty-state" class="empty-state-box">
-          <div class="empty-state-icon">
-            <i class="bi bi-shield-check text-success"></i>
-          </div>
-          <h5 class="text-light">All Systems Normal</h5>
-          <p class="text-muted small mb-0">No active alerts detected across the fleet.</p>
-        </div>
-      </section>
-
-      <!-- ================= SECTION 5: LIVE 30S REFRESH & MONITORING STREAM ================= -->
-      <section id="section-activity" class="dash-card">
+      <!-- ================= LEVEL 8: RECENT ACTIVITY (PHASE 16) ================= -->
+      <section id="section-activity" class="dash-card mb-4">
         <div class="dash-card-header flex-wrap gap-2">
           <div>
             <h2 class="dash-card-title">
               <i class="bi bi-clock-history text-secondary"></i>
-              Live 30s Refresh & System Monitoring Stream
+              RECENT ACTIVITY & MONITORING STREAM
             </h2>
-            <span class="text-muted" style="font-size: 0.8rem;">Chronological telemetry stream captured every 30-second monitoring cycle</span>
+            <span class="text-muted" style="font-size: 0.8rem;">Chronological telemetry stream captured from live monitoring runs</span>
           </div>
           <span class="badge badge-soft-info d-flex align-items-center gap-1 font-monospace">
             <span class="status-dot online"></span>
-            <span>30s Active Stream</span>
+            <span>Live Stream</span>
           </span>
         </div>
         <div class="dash-table-wrapper">
           <table class="dash-table" id="activity-table">
             <thead>
               <tr>
-                <th>Poll Timestamp</th>
+                <th>Timestamp</th>
                 <th>Server</th>
                 <th>Status</th>
                 <th>Collected Metrics Snapshot</th>
-                <th>30s Variation (Δ)</th>
-                <th>Poll Outcome</th>
+                <th>Variation (&Delta;)</th>
+                <th>Outcome</th>
               </tr>
             </thead>
             <tbody id="activity-table-body">
@@ -525,11 +794,22 @@
         </div>
       </section>
 
+      <!-- System Footer -->
+      <footer class="dash-footer">
+        <div>
+          <span class="status-dot online me-1"></span>
+          <span>Monitoring active &bull; Auto refresh: <strong>10 seconds</strong></span>
+        </div>
+        <div>
+          <span>Last system sync: <span id="footer-last-updated" class="font-monospace">--:--:--</span></span>
+        </div>
+      </footer>
+
     </main>
   </div>
 </div>
 
-<!-- ================= SERVER DRILL-DOWN MODAL ================= -->
+<!-- ================= SERVER DRILL-DOWN MODAL (PHASE 13) ================= -->
 <div class="modal fade dash-modal" id="serverDetailModal" tabindex="-1" aria-labelledby="serverDetailModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">

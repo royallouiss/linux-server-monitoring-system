@@ -1,6 +1,6 @@
 /**
  * Linux Server Monitoring System - Dashboard Application
- * Production Observability Client Script
+ * Infrastructure Command Center Observability Client Script
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,17 +9,25 @@ document.addEventListener('DOMContentLoaded', () => {
     servers: [],
     stats: null,
     alerts: [],
-    currentServerFilter: 'ALL',
+    currentServerFilter: 'ALL', // 'ALL' | 'HEALTHY' | 'WARNING' | 'DOWN'
     searchQuery: '',
     currentAlertFilter: 'ACTIVE',
     selectedServerId: null,
     selectedRange: '24h',
-    autoRefreshInterval: 30000,
-    countdownSeconds: 30,
+    autoRefreshInterval: 10000, // Exactly 10 seconds
+    countdownSeconds: 10,
     countdownTimer: null,
     isFetching: false,
     theme: localStorage.getItem('dash_theme') || 'dark',
+    chartModel: localStorage.getItem('dash_chart_model') || 'zigzag', // 'zigzag' | 'smooth' | 'stepped'
+    chartScaleMode: localStorage.getItem('dash_chart_scale') || 'dynamic', // 'dynamic' | 'fixed'
     charts: {
+      cpu: null,
+      memory: null,
+      disk: null,
+      network: null,
+    },
+    sparklines: {
       cpu: null,
       memory: null,
       disk: null,
@@ -30,45 +38,106 @@ document.addEventListener('DOMContentLoaded', () => {
   // DOM Elements Cache
   const el = {
     app: document.getElementById('dashboard-app'),
-    statTotal: document.getElementById('stat-total-servers'),
-    statOnline: document.getElementById('stat-online-servers'),
-    statOffline: document.getElementById('stat-offline-servers'),
-    statAlerts: document.getElementById('stat-active-alerts'),
-    statOnlineSub: document.getElementById('stat-online-subtext'),
-    statOfflineSub: document.getElementById('stat-offline-subtext'),
-    statAlertsSub: document.getElementById('stat-alerts-subtext'),
-    statAvgCpu: document.getElementById('stat-avg-cpu'),
-    statAvgCpuDelta: document.getElementById('stat-avg-cpu-delta'),
-    statAvgMemory: document.getElementById('stat-avg-memory'),
-    statAvgMemoryDelta: document.getElementById('stat-avg-memory-delta'),
-    sidebarFleetStatus: document.getElementById('sidebar-fleet-status'),
-    sidebarServerCount: document.getElementById('sidebar-server-count'),
+    // System Command Bar (Level 1)
+    systemStatusPill: document.getElementById('system-status-pill'),
+    systemStatusDot: document.getElementById('system-status-dot'),
+    systemStatusText: document.getElementById('system-status-text'),
+    statTotalChip: document.getElementById('stat-total-chip'),
+    statOnlineChip: document.getElementById('stat-online-chip'),
+    statWarningChip: document.getElementById('stat-warning-chip'),
+    statOfflineChip: document.getElementById('stat-offline-chip'),
+    statAlertsChip: document.getElementById('stat-alerts-chip'),
     lastUpdatedTime: document.getElementById('last-updated-time'),
-    countdownBadge: document.getElementById('refresh-countdown-badge'),
+    footerLastUpdated: document.getElementById('footer-last-updated'),
+    refreshStatusBadge: document.getElementById('refresh-status-badge'),
     countdownSec: document.getElementById('refresh-countdown-sec'),
-    liveRefreshBar: document.getElementById('live-refresh-bar'),
-    liveRefreshDot: document.getElementById('live-refresh-dot'),
-    liveRefreshTime: document.getElementById('live-refresh-time'),
-    liveRefreshMetrics: document.getElementById('live-refresh-metrics'),
-    liveRefreshBadge: document.getElementById('live-refresh-status-badge'),
     refreshBtn: document.getElementById('btn-refresh-all'),
     refreshIcon: document.getElementById('refresh-icon'),
-    autoRefreshLabel: document.getElementById('auto-refresh-label'),
     themeToggleBtn: document.getElementById('btn-theme-toggle'),
     themeToggleIcon: document.getElementById('theme-toggle-icon'),
     sidebarToggleBtn: document.getElementById('sidebar-toggle'),
     sidebar: document.getElementById('dash-sidebar'),
+    sidebarFleetStatus: document.getElementById('sidebar-fleet-status'),
+    sidebarServerCount: document.getElementById('sidebar-server-count'),
+    sidebarStatusDot: document.getElementById('sidebar-status-dot'),
+    errorBanner: document.getElementById('dash-error-banner'),
+    errorMessage: document.getElementById('dash-error-message'),
+    btnErrorRetry: document.getElementById('btn-error-retry'),
+
+    // KPI Cards (Level 2)
+    statTotal: document.getElementById('stat-total-servers'),
+    statOnline: document.getElementById('stat-online-servers'),
+    statOnlineSub: document.getElementById('stat-online-subtext'),
+    statWarning: document.getElementById('stat-warning-servers'),
+    statWarningSub: document.getElementById('stat-warning-subtext'),
+    statOffline: document.getElementById('stat-offline-servers'),
+    statOfflineSub: document.getElementById('stat-offline-subtext'),
+    statAlerts: document.getElementById('stat-active-alerts'),
+    statAlertsSub: document.getElementById('stat-alerts-subtext'),
+    statSuccessRate: document.getElementById('stat-success-rate'),
+    statSuccessSub: document.getElementById('stat-success-subtext'),
+
+    // Server Health Matrix (Level 3)
     serverSearchInput: document.getElementById('server-search-input'),
     serversTableBody: document.getElementById('servers-table-body'),
     serversEmptyState: document.getElementById('servers-empty-state'),
     btnClearSearch: document.getElementById('btn-clear-search'),
-    chartServerSelect: document.getElementById('chart-server-select'),
+
+    // Resource Overview (Level 4A)
+    overviewCpuVal: document.getElementById('overview-cpu-val'),
+    overviewCpuStatus: document.getElementById('overview-cpu-status'),
+    overviewCpuDelta: document.getElementById('overview-cpu-delta'),
+    overviewMemVal: document.getElementById('overview-mem-val'),
+    overviewMemStatus: document.getElementById('overview-mem-status'),
+    overviewMemDelta: document.getElementById('overview-mem-delta'),
+    overviewDiskVal: document.getElementById('overview-disk-val'),
+    overviewDiskStatus: document.getElementById('overview-disk-status'),
+    overviewDiskDelta: document.getElementById('overview-disk-delta'),
+    overviewNetVal: document.getElementById('overview-net-val'),
+    overviewNetStatus: document.getElementById('overview-net-status'),
+    overviewNetDelta: document.getElementById('overview-net-delta'),
+
+    // Resource Heatmap (Level 4B)
+    heatmapTableBody: document.getElementById('heatmap-table-body'),
+
+    // Alerts & Action Tasks (Level 5)
     alertsListContainer: document.getElementById('alerts-list-container'),
     alertsEmptyState: document.getElementById('alerts-empty-state'),
+    actionTasksContainer: document.getElementById('action-tasks-container'),
+
+    // Monitoring Engine (Level 6)
+    engineServiceStatus: document.getElementById('engine-service-status'),
+    engineSchedulerStatus: document.getElementById('engine-scheduler-status'),
+    engineRunnerStatus: document.getElementById('engine-runner-status'),
+    engineLastSuccess: document.getElementById('engine-last-success'),
+    engineLastFail: document.getElementById('engine-last-fail'),
+    engineLastCheck: document.getElementById('engine-last-check'),
+    engineNextRefresh: document.getElementById('engine-next-refresh'),
+    engineOverallBadge: document.getElementById('engine-overall-badge'),
+
+    // Historical Analytics (Level 7)
+    chartServerSelect: document.getElementById('chart-server-select'),
+    chartModelGroup: document.getElementById('chart-model-group'),
+    btnChartScaleToggle: document.getElementById('btn-chart-scale-toggle'),
+    chartScaleLabel: document.getElementById('chart-scale-label'),
+    chartScaleIcon: document.getElementById('chart-scale-icon'),
+    btnChartCollectSample: document.getElementById('btn-chart-collect-sample'),
+    statCpuCurrent: document.getElementById('stat-cpu-current'),
+    statCpuAvg: document.getElementById('stat-cpu-avg'),
+    statCpuPeak: document.getElementById('stat-cpu-peak'),
+    statMemCurrent: document.getElementById('stat-mem-current'),
+    statMemAvg: document.getElementById('stat-mem-avg'),
+    statMemPeak: document.getElementById('stat-mem-peak'),
+    statDiskCurrent: document.getElementById('stat-disk-current'),
+    statDiskAvg: document.getElementById('stat-disk-avg'),
+    statDiskPeak: document.getElementById('stat-disk-peak'),
+    statNetCurrent: document.getElementById('stat-net-current'),
+    statNetAvg: document.getElementById('stat-net-avg'),
+    statNetPeak: document.getElementById('stat-net-peak'),
+
+    // Activity Stream (Level 8)
     activityTableBody: document.getElementById('activity-table-body'),
-    errorBanner: document.getElementById('dash-error-banner'),
-    errorMessage: document.getElementById('dash-error-message'),
-    btnErrorRetry: document.getElementById('btn-error-retry'),
+
     // Modal elements
     modalEl: document.getElementById('serverDetailModal'),
     modalName: document.getElementById('modal-server-name'),
@@ -95,15 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
     modalSshOutput: document.getElementById('modal-ssh-output'),
     btnModalTestSsh: document.getElementById('btn-modal-test-ssh'),
     btnModalCollect: document.getElementById('btn-modal-collect'),
-    // Chart current value badges
-    badgeCpu: document.getElementById('current-cpu-badge'),
-    badgeMem: document.getElementById('current-mem-badge'),
-    badgeDisk: document.getElementById('current-disk-badge'),
-    badgeNet: document.getElementById('current-net-badge'),
-    deltaCpuBadge: document.getElementById('delta-cpu-badge'),
-    deltaMemBadge: document.getElementById('delta-mem-badge'),
-    deltaDiskBadge: document.getElementById('delta-disk-badge'),
-    deltaNetBadge: document.getElementById('delta-net-badge'),
   };
 
   // Helper: Get CSRF Token
@@ -159,10 +219,10 @@ document.addEventListener('DOMContentLoaded', () => {
         item.classList.remove('show');
         setTimeout(() => item.remove(), 400);
       }
-    }, 4500);
+    }, 4000);
   }
 
-  // Format relative time
+  // Format relative time (e.g. "8 sec ago")
   function formatRelativeTime(dateString) {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
@@ -171,14 +231,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const now = new Date();
     const diffSeconds = Math.floor((now - date) / 1000);
 
-    if (diffSeconds < 10) return 'Just now';
-    if (diffSeconds < 60) return `${diffSeconds}s ago`;
+    if (diffSeconds < 5) return 'Just now';
+    if (diffSeconds < 60) return `${diffSeconds} sec ago`;
     const diffMinutes = Math.floor(diffSeconds / 60);
     if (diffMinutes < 60) return `${diffMinutes}m ago`;
     const diffHours = Math.floor(diffMinutes / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
     const diffDays = Math.floor(diffHours / 24);
     return `${diffDays}d ago`;
+  }
+
+  function formatTimeOnly(dateString) {
+    if (!dateString) return 'Never';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Never';
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
   function getOsBadge(os) {
@@ -204,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/"/g, '&quot;');
   }
 
-  // Helper: 30s Delta Variation Formatting
+  // Helper: Delta Variation Formatting
   function renderDeltaPill(delta, unit = '%', invertSemantic = false) {
     if (typeof delta !== 'number' || isNaN(delta)) {
       return `<span class="badge-delta badge-delta-neutral font-monospace">0.00${unit}</span>`;
@@ -212,12 +279,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const abs = Math.abs(delta).toFixed(2);
     if (delta > 0) {
       const cls = invertSemantic ? 'badge-delta-down' : 'badge-delta-up';
-      return `<span class="badge-delta ${cls} font-monospace" title="30s variation: +${abs}${unit}"><i class="bi bi-arrow-up-short"></i>+${abs}${unit}</span>`;
+      return `<span class="badge-delta ${cls} font-monospace" title="10s variation: +${abs}${unit}"><i class="bi bi-arrow-up-short"></i>+${abs}${unit}</span>`;
     } else if (delta < 0) {
       const cls = invertSemantic ? 'badge-delta-up' : 'badge-delta-down';
-      return `<span class="badge-delta ${cls} font-monospace" title="30s variation: -${abs}${unit}"><i class="bi bi-arrow-down-short"></i>-${abs}${unit}</span>`;
+      return `<span class="badge-delta ${cls} font-monospace" title="10s variation: -${abs}${unit}"><i class="bi bi-arrow-down-short"></i>-${abs}${unit}</span>`;
     } else {
-      return `<span class="badge-delta badge-delta-neutral font-monospace" title="30s variation: 0.00${unit}"><i class="bi bi-dash"></i>0.00${unit}</span>`;
+      return `<span class="badge-delta badge-delta-neutral font-monospace" title="10s variation: 0.00${unit}"><i class="bi bi-dash"></i>0.00${unit}</span>`;
     }
   }
 
@@ -226,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof delta !== 'number' || isNaN(delta)) {
       badgeEl.className = 'badge-delta badge-delta-neutral font-monospace';
       badgeEl.innerHTML = `<i class="bi bi-dash"></i>0.00${unit}`;
-      badgeEl.title = `30s variation: 0.00${unit}`;
+      badgeEl.title = `10s variation: 0.00${unit}`;
       return;
     }
     const abs = Math.abs(delta).toFixed(2);
@@ -234,20 +301,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const cls = invertSemantic ? 'badge-delta-down' : 'badge-delta-up';
       badgeEl.className = `badge-delta ${cls} font-monospace`;
       badgeEl.innerHTML = `<i class="bi bi-arrow-up-short"></i>+${abs}${unit}`;
-      badgeEl.title = `30s variation: +${abs}${unit}`;
+      badgeEl.title = `10s variation: +${abs}${unit}`;
     } else if (delta < 0) {
       const cls = invertSemantic ? 'badge-delta-up' : 'badge-delta-down';
       badgeEl.className = `badge-delta ${cls} font-monospace`;
       badgeEl.innerHTML = `<i class="bi bi-arrow-down-short"></i>-${abs}${unit}`;
-      badgeEl.title = `30s variation: -${abs}${unit}`;
+      badgeEl.title = `10s variation: -${abs}${unit}`;
     } else {
       badgeEl.className = 'badge-delta badge-delta-neutral font-monospace';
       badgeEl.innerHTML = `<i class="bi bi-dash"></i>0.00${unit}`;
-      badgeEl.title = `30s variation: 0.00${unit}`;
+      badgeEl.title = `10s variation: 0.00${unit}`;
     }
   }
 
-  // ================= API CALLS =================
+  // ================= API LAYER =================
 
   async function apiFetch(url, options = {}) {
     const res = await fetch(url, options);
@@ -324,128 +391,143 @@ document.addEventListener('DOMContentLoaded', () => {
     return await res.json();
   }
 
-  // ================= RENDER FUNCTIONS =================
+  // ================= RENDER LEVEL 1: TOP SYSTEM HEALTH BAR =================
 
-  function renderStats(stats) {
+  function renderSystemHealthBar(stats) {
     if (!stats) return;
-    state.stats = stats;
 
-    if (el.statTotal) el.statTotal.textContent = stats.total_servers;
-    if (el.statOnline) el.statOnline.textContent = stats.online_servers;
-    if (el.statOffline) el.statOffline.textContent = stats.offline_servers;
-    if (el.statAlerts) el.statAlerts.textContent = stats.active_alerts;
+    const sysStatus = (stats.system_status || 'HEALTHY').toUpperCase();
+    if (el.systemStatusPill) {
+      el.systemStatusPill.className = `system-status-pill ${sysStatus.toLowerCase()}`;
+    }
+    if (el.systemStatusText) {
+      el.systemStatusText.textContent = sysStatus;
+    }
+    if (el.systemStatusDot) {
+      el.systemStatusDot.className = `status-dot ${sysStatus === 'HEALTHY' ? 'online' : sysStatus === 'WARNING' ? 'warning' : 'offline'}`;
+    }
+
+    // Counters
+    if (el.statTotalChip) el.statTotalChip.textContent = stats.total_servers ?? 0;
+    if (el.statOnlineChip) el.statOnlineChip.textContent = stats.online_servers ?? 0;
+    if (el.statWarningChip) el.statWarningChip.textContent = stats.warning_servers ?? 0;
+    if (el.statOfflineChip) el.statOfflineChip.textContent = stats.offline_servers ?? 0;
+    if (el.statAlertsChip) el.statAlertsChip.textContent = stats.active_alerts ?? 0;
+
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (el.lastUpdatedTime) el.lastUpdatedTime.textContent = nowStr;
+    if (el.footerLastUpdated) el.footerLastUpdated.textContent = nowStr;
+
+    if (el.sidebarFleetStatus) {
+      el.sidebarFleetStatus.textContent = sysStatus === 'CRITICAL'
+        ? `${stats.offline_servers || 1} Offline Issue`
+        : sysStatus === 'WARNING'
+        ? 'Fleet Warnings Pending'
+        : 'All Systems Healthy';
+    }
+    if (el.sidebarStatusDot) {
+      el.sidebarStatusDot.className = `status-dot ${sysStatus === 'HEALTHY' ? 'online' : sysStatus === 'WARNING' ? 'warning' : 'offline'}`;
+    }
+    if (el.sidebarServerCount) {
+      const count = stats.total_servers ?? 0;
+      el.sidebarServerCount.textContent = `Monitoring ${count} ${count === 1 ? 'Server' : 'Servers'}`;
+    }
+  }
+
+  // ================= RENDER LEVEL 2: KPI CARDS =================
+
+  function renderKpis(stats) {
+    if (!stats) return;
+
+    if (el.statTotal) el.statTotal.textContent = stats.total_servers ?? 0;
+    if (el.statOnline) el.statOnline.textContent = stats.online_servers ?? 0;
+    if (el.statWarning) el.statWarning.textContent = stats.warning_servers ?? 0;
+    if (el.statOffline) el.statOffline.textContent = stats.offline_servers ?? 0;
+    if (el.statAlerts) el.statAlerts.textContent = stats.active_alerts ?? 0;
+
+    const successPct = stats.monitoring_success_rate ?? stats.healthy_percent ?? 100.0;
+    if (el.statSuccessRate) el.statSuccessRate.textContent = `${Number(successPct).toFixed(1)}%`;
 
     if (el.statOnlineSub) {
       el.statOnlineSub.innerHTML = `
         <span class="badge ${stats.offline_servers > 0 ? 'bg-warning text-dark' : 'bg-success'}">${stats.healthy_percent}%</span>
-        <span>${stats.offline_servers > 0 ? 'Degraded fleet' : 'Operating normally'}</span>
+        <span>${stats.offline_servers > 0 ? 'Degraded fleet' : 'Responsive'}</span>
+      `;
+    }
+
+    if (el.statWarningSub) {
+      el.statWarningSub.innerHTML = `
+        <span class="badge ${stats.warning_servers > 0 ? 'bg-warning text-dark' : 'bg-secondary'}">${stats.warning_servers} Elevated</span>
+        <span>${stats.warning_servers > 0 ? 'Investigate' : 'Normal'}</span>
       `;
     }
 
     if (el.statOfflineSub) {
       el.statOfflineSub.innerHTML = `
         <span class="badge ${stats.offline_servers > 0 ? 'bg-danger' : 'bg-secondary'}">${stats.offline_servers} Issues</span>
-        <span>${stats.offline_servers > 0 ? 'Requires attention' : 'All responsive'}</span>
+        <span>${stats.offline_servers > 0 ? 'Requires attention' : 'All connected'}</span>
       `;
     }
 
     if (el.statAlertsSub) {
       el.statAlertsSub.innerHTML = `
         <span class="badge ${stats.critical_alerts > 0 ? 'bg-danger' : 'bg-secondary'}">${stats.critical_alerts} Critical</span>
-        <span>${stats.active_alerts > 0 ? 'Active incidents' : 'All clear'}</span>
+        <span>${stats.active_alerts > 0 ? 'Active alerts' : 'Fleet normal'}</span>
       `;
     }
 
-    if (el.statAvgCpu) {
-      el.statAvgCpu.textContent = `${Number(stats.avg_cpu || 0).toFixed(1)}%`;
-    }
-    if (el.statAvgCpuDelta) {
-      updateDeltaBadgeEl(el.statAvgCpuDelta, stats.avg_cpu_delta || 0, '%');
-    }
-
-    if (el.statAvgMemory) {
-      el.statAvgMemory.textContent = `${Number(stats.avg_memory || 0).toFixed(1)}%`;
-    }
-    if (el.statAvgMemoryDelta) {
-      updateDeltaBadgeEl(el.statAvgMemoryDelta, stats.avg_memory_delta || 0, '%');
-    }
-
-    if (el.sidebarFleetStatus) {
-      el.sidebarFleetStatus.textContent = stats.offline_servers > 0
-        ? `${stats.offline_servers} Server Offline`
-        : 'All Systems Healthy';
-    }
-
-    if (el.sidebarServerCount) {
-      el.sidebarServerCount.textContent = `Monitoring ${stats.total_servers} ${stats.total_servers === 1 ? 'Server' : 'Servers'}`;
-    }
-
-    if (el.lastUpdatedTime) {
-      const now = new Date();
-      el.lastUpdatedTime.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (el.statSuccessSub) {
+      el.statSuccessSub.innerHTML = `
+        <span class="badge ${successPct < 90 ? 'bg-danger' : 'bg-success'}">${successPct >= 99 ? 'Optimal' : 'Active'}</span>
+        <span>Scheduled runs</span>
+      `;
     }
   }
 
-  function renderLiveRefreshBanner(stats, servers) {
-    if (!el.liveRefreshBar) return;
+  // ================= RENDER LEVEL 3: SERVER HEALTH MATRIX (PHASE 5-8) =================
 
-    if (el.liveRefreshTime) {
-      const now = new Date();
-      el.liveRefreshTime.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    }
+  function renderServerHealthMatrix() {
+    if (!el.serversTableBody) return;
 
-    if (el.liveRefreshMetrics) {
-      if (servers && servers.length > 0) {
-        const s = servers[0];
-        const m = s.latest_metrics;
-        const cpuPill = m && m.cpu ? renderDeltaPill(m.cpu.delta, '%') : '';
-        const memPill = m && m.memory ? renderDeltaPill(m.memory.delta, '%') : '';
-        const diskPill = m && m.disk ? renderDeltaPill(m.disk.delta, '%') : '';
-        const rxPill = m && m.network ? renderDeltaPill(m.network.rx_delta_kbps, ' KB/s') : '';
+    let list = [...state.servers];
 
-        const cpuVal = m && m.cpu ? `${m.cpu.usage_percent}%` : '0.0%';
-        const memVal = m && m.memory ? `${m.memory.usage_percent}%` : '0.0%';
-        const diskVal = m && m.disk ? `${m.disk.usage_percent}%` : '0.0%';
-        const rxVal = m && m.network ? `${m.network.receive_rate_kbps} KB/s` : '0.0 KB/s';
+    // Attention-First Sorting Priority:
+    // 1. Offline (DOWN)
+    // 2. Critical Health / Critical Alert
+    // 3. Warning
+    // 4. Healthy (UP)
+    list.sort((a, b) => {
+      const getRank = (s) => {
+        if (s.status === 'DOWN') return 0;
+        if (s.health_status === 'CRITICAL') return 1;
+        if (s.health_status === 'WARNING' || s.active_alerts_count > 0) return 2;
+        if (s.status === 'UP') return 3;
+        return 4;
+      };
+      return getRank(a) - getRank(b);
+    });
 
-        el.liveRefreshMetrics.innerHTML = `
-          <span class="badge badge-soft-info"><i class="bi bi-server me-1"></i>${escapeHtml(s.server_name)}</span>
-          <span class="badge bg-dark border border-secondary text-light font-monospace">CPU: ${cpuVal} ${cpuPill}</span>
-          <span class="badge bg-dark border border-secondary text-light font-monospace">RAM: ${memVal} ${memPill}</span>
-          <span class="badge bg-dark border border-secondary text-light font-monospace">Disk: ${diskVal} ${diskPill}</span>
-          <span class="badge bg-dark border border-secondary text-light font-monospace">Net RX: ${rxVal} ${rxPill}</span>
-        `;
-      } else {
-        el.liveRefreshMetrics.innerHTML = '<span class="text-muted font-monospace">Waiting for active telemetry...</span>';
+    // Filter by Status
+    if (state.currentServerFilter !== 'ALL') {
+      if (state.currentServerFilter === 'HEALTHY') {
+        list = list.filter(s => s.status === 'UP' && (s.health_status === 'HEALTHY' || !s.health_status));
+      } else if (state.currentServerFilter === 'WARNING') {
+        list = list.filter(s => s.health_status === 'WARNING' || (s.status === 'UP' && s.active_alerts_count > 0));
+      } else if (state.currentServerFilter === 'DOWN') {
+        list = list.filter(s => s.status === 'DOWN');
       }
     }
 
-    // Trigger visual highlight animation
-    el.liveRefreshBar.classList.remove('poll-flash');
-    void el.liveRefreshBar.offsetWidth; // Trigger DOM reflow
-    el.liveRefreshBar.classList.add('poll-flash');
-  }
-
-  function renderServersTable() {
-    if (!el.serversTableBody) return;
-
-    let filtered = state.servers;
-
-    // Filter by status
-    if (state.currentServerFilter !== 'ALL') {
-      filtered = filtered.filter(s => s.status === state.currentServerFilter);
-    }
-
-    // Filter by search
+    // Filter by Search Query
     if (state.searchQuery.trim() !== '') {
       const q = state.searchQuery.toLowerCase();
-      filtered = filtered.filter(s =>
+      list = list.filter(s =>
         (s.server_name && s.server_name.toLowerCase().includes(q)) ||
         (s.hostname && s.hostname.toLowerCase().includes(q))
       );
     }
 
-    if (filtered.length === 0) {
+    if (list.length === 0) {
       el.serversTableBody.innerHTML = '';
       if (el.serversEmptyState) el.serversEmptyState.classList.remove('d-none');
       return;
@@ -453,111 +535,137 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (el.serversEmptyState) el.serversEmptyState.classList.add('d-none');
 
-    const rowsHtml = filtered.map(server => {
+    const rowsHtml = list.map(server => {
+      const isDown = server.status === 'DOWN';
+      const isWarn = server.health_status === 'WARNING' || server.active_alerts_count > 0;
+      const rowAttentionClass = isDown ? 'matrix-row-attention-critical' : isWarn ? 'matrix-row-attention-warning' : '';
+
+      // Status Badge (Phase 7: Explicit semantics)
+      let statusBadge;
+      if (isDown) {
+        statusBadge = '<span class="badge badge-soft-danger"><span class="status-dot offline me-1"></span> Offline</span>';
+      } else if (isWarn) {
+        statusBadge = '<span class="badge badge-soft-warning"><i class="bi bi-exclamation-triangle-fill me-1"></i> Warning</span>';
+      } else if (server.status === 'UP') {
+        statusBadge = '<span class="badge badge-soft-success"><span class="status-dot online me-1"></span> Online</span>';
+      } else {
+        statusBadge = '<span class="badge badge-soft-secondary"><i class="bi bi-question-circle me-1"></i> Unknown</span>';
+      }
+
       const m = server.latest_metrics;
-      const statusBadge =
-        server.status === 'UP' ? '<span class="badge badge-soft-success"><span class="status-dot online me-1"></span> ONLINE</span>' :
-        server.status === 'DOWN' ? '<span class="badge badge-soft-danger"><span class="status-dot offline me-1"></span> OFFLINE</span>' :
-        '<span class="badge badge-soft-warning"><span class="status-dot unknown me-1"></span> UNKNOWN</span>';
 
-      const cpuUsage = m && m.cpu ? m.cpu.usage_percent : 0;
-      const cpuLoad = m && m.cpu ? `Load: ${m.cpu.load_1m}, ${m.cpu.load_5m}` : 'Load: N/A';
-      const cpuDeltaPill = renderDeltaPill(m && m.cpu ? m.cpu.delta : 0, '%');
+      // CPU cell (Phase 6: compact indicator with progress bar & %)
+      let cpuCell;
+      if (m && m.cpu && !isDown) {
+        const cpuPct = m.cpu.usage_percent;
+        const cpuDeltaPill = renderDeltaPill(m.cpu.delta, '%');
+        const cpuLoad = `Load: ${m.cpu.load_1m}, ${m.cpu.load_5m}`;
+        cpuCell = `
+          <div class="metric-meter-compact" title="${cpuLoad}">
+            <div class="meter-top">
+              <span class="meter-pct">${cpuPct}%</span>
+              ${cpuDeltaPill}
+            </div>
+            <div class="meter-track-sm">
+              <div class="meter-fill-sm ${getMeterColorClass(cpuPct)}" style="width: ${Math.min(100, Math.max(0, cpuPct))}%;"></div>
+            </div>
+          </div>
+        `;
+      } else {
+        cpuCell = '<span class="text-muted font-monospace">--</span>';
+      }
 
-      const memUsage = m && m.memory ? m.memory.usage_percent : 0;
-      const memText = m && m.memory ? `${m.memory.used_gb} / ${m.memory.total_gb} GB` : 'N/A';
-      const memDeltaPill = renderDeltaPill(m && m.memory ? m.memory.delta : 0, '%');
+      // Memory cell
+      let memCell;
+      if (m && m.memory && !isDown) {
+        const memPct = m.memory.usage_percent;
+        const memDeltaPill = renderDeltaPill(m.memory.delta, '%');
+        const memText = `${m.memory.used_gb} / ${m.memory.total_gb} GB`;
+        memCell = `
+          <div class="metric-meter-compact" title="${memText}">
+            <div class="meter-top">
+              <span class="meter-pct">${memPct}%</span>
+              ${memDeltaPill}
+            </div>
+            <div class="meter-track-sm">
+              <div class="meter-fill-sm ${getMeterColorClass(memPct)}" style="width: ${Math.min(100, Math.max(0, memPct))}%;"></div>
+            </div>
+          </div>
+        `;
+      } else {
+        memCell = '<span class="text-muted font-monospace">--</span>';
+      }
 
-      const diskUsage = m && m.disk ? m.disk.usage_percent : 0;
-      const diskText = m && m.disk ? `${m.disk.used_gb} / ${m.disk.total_gb} GB` : 'N/A';
-      const diskDeltaPill = renderDeltaPill(m && m.disk ? m.disk.delta : 0, '%');
+      // Disk cell
+      let diskCell;
+      if (m && m.disk && !isDown) {
+        const diskPct = m.disk.usage_percent;
+        const diskDeltaPill = renderDeltaPill(m.disk.delta, '%');
+        const diskText = `${m.disk.used_gb} / ${m.disk.total_gb} GB (${m.disk.mount_point})`;
+        diskCell = `
+          <div class="metric-meter-compact" title="${diskText}">
+            <div class="meter-top">
+              <span class="meter-pct">${diskPct}%</span>
+              ${diskDeltaPill}
+            </div>
+            <div class="meter-track-sm">
+              <div class="meter-fill-sm ${getMeterColorClass(diskPct)}" style="width: ${Math.min(100, Math.max(0, diskPct))}%;"></div>
+            </div>
+          </div>
+        `;
+      } else {
+        diskCell = '<span class="text-muted font-monospace">--</span>';
+      }
 
-      const netRx = m && m.network ? `${m.network.receive_rate_kbps} KB/s` : '0 KB/s';
-      const netTx = m && m.network ? `${m.network.transmit_rate_kbps} KB/s` : '0 KB/s';
-      const rxDeltaPill = renderDeltaPill(m && m.network ? m.network.rx_delta_kbps : 0, ' KB/s');
-      const txDeltaPill = renderDeltaPill(m && m.network ? m.network.tx_delta_kbps : 0, ' KB/s');
+      // Network cell
+      let netCell;
+      if (m && m.network && !isDown) {
+        const rx = `${m.network.receive_rate_kbps} KB/s`;
+        const tx = `${m.network.transmit_rate_kbps} KB/s`;
+        netCell = `
+          <div style="font-size: 0.76rem; font-family: ui-monospace, monospace;">
+            <div class="text-info"><i class="bi bi-arrow-down-short"></i>${rx}</div>
+            <div class="text-secondary"><i class="bi bi-arrow-up-short"></i>${tx}</div>
+          </div>
+        `;
+      } else {
+        netCell = '<span class="text-muted font-monospace">--</span>';
+      }
 
+      // Last Check
       const relativeCheck = formatRelativeTime(server.last_check_at);
 
-      const alertBadge = server.active_alerts_count > 0
-        ? `<span class="badge bg-warning text-dark"><i class="bi bi-bell-fill me-1"></i>${server.active_alerts_count}</span>`
-        : `<span class="badge badge-soft-success"><i class="bi bi-shield-check me-1"></i>Clean</span>`;
+      // Alert cell
+      let alertCell;
+      if (isDown) {
+        alertCell = '<span class="badge bg-danger" title="SSH connection failed"><i class="bi bi-exclamation-octagon me-1"></i>Offline</span>';
+      } else if (server.active_alerts_count > 0) {
+        alertCell = `<span class="badge bg-warning text-dark"><i class="bi bi-bell-fill me-1"></i>${server.active_alerts_count} Active</span>`;
+      } else {
+        alertCell = '<span class="badge badge-soft-success"><i class="bi bi-shield-check me-1"></i>None</span>';
+      }
 
       return `
-        <tr data-server-id="${server.id}">
+        <tr class="${rowAttentionClass}" data-server-id="${server.id}">
           <td>
-            <div class="server-title">
-              <span>${escapeHtml(server.server_name)}</span>
-            </div>
-            <div class="hostname-sub">
-              ${getOsBadge(server.operating_system)} • ${escapeHtml(server.hostname)}
+            <div class="fw-bold text-light">${escapeHtml(server.server_name)}</div>
+            <div class="text-muted" style="font-size: 0.72rem;">
+              ${getOsBadge(server.operating_system)} &bull; <span class="font-monospace">${escapeHtml(server.hostname)}</span>
             </div>
           </td>
           <td>${statusBadge}</td>
-          <td>
-            <div class="metric-meter" title="${cpuLoad}">
-              <div class="metric-meter-label">
-                <span>CPU</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span>${cpuUsage}%</span>
-                  ${cpuDeltaPill}
-                </div>
-              </div>
-              <div class="meter-track">
-                <div class="meter-fill ${getMeterColorClass(cpuUsage)}" style="width: ${Math.min(100, Math.max(0, cpuUsage))}%;"></div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div class="metric-meter" title="${memText}">
-              <div class="metric-meter-label">
-                <span>RAM</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span>${memUsage}%</span>
-                  ${memDeltaPill}
-                </div>
-              </div>
-              <div class="meter-track">
-                <div class="meter-fill ${getMeterColorClass(memUsage)}" style="width: ${Math.min(100, Math.max(0, memUsage))}%;"></div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div class="metric-meter" title="${diskText}">
-              <div class="metric-meter-label">
-                <span>Disk</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span>${diskUsage}%</span>
-                  ${diskDeltaPill}
-                </div>
-              </div>
-              <div class="meter-track">
-                <div class="meter-fill ${getMeterColorClass(diskUsage)}" style="width: ${Math.min(100, Math.max(0, diskUsage))}%;"></div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div style="font-size: 0.78rem;">
-              <div class="d-flex align-items-center gap-1">
-                <span class="text-info"><i class="bi bi-arrow-down-short"></i>${netRx}</span>
-                ${rxDeltaPill}
-              </div>
-              <div class="d-flex align-items-center gap-1 mt-1">
-                <span class="text-primary"><i class="bi bi-arrow-up-short"></i>${netTx}</span>
-                ${txDeltaPill}
-              </div>
-            </div>
-          </td>
-          <td>
-            <span class="small font-monospace" title="${server.last_check_at || ''}">${relativeCheck}</span>
-          </td>
-          <td>${alertBadge}</td>
+          <td>${cpuCell}</td>
+          <td>${memCell}</td>
+          <td>${diskCell}</td>
+          <td>${netCell}</td>
+          <td><span class="small font-monospace" title="${server.last_check_at || ''}">${relativeCheck}</span></td>
+          <td>${alertCell}</td>
           <td class="text-end">
-            <div class="btn-group btn-group-sm">
-              <button class="btn btn-outline-primary btn-server-details" data-id="${server.id}" title="View Telemetry">
+            <div class="btn-group btn-group-sm" role="group">
+              <button class="btn btn-outline-primary btn-server-details" data-id="${server.id}" title="Inspect Server Telemetry">
                 <i class="bi bi-eye-fill"></i>
               </button>
-              <button class="btn btn-outline-secondary btn-server-test" data-id="${server.id}" title="Quick Test SSH">
+              <button class="btn btn-outline-secondary btn-server-test" data-id="${server.id}" title="Test SSH Connection">
                 <i class="bi bi-plug-fill"></i>
               </button>
               <button class="btn btn-outline-success btn-server-collect" data-id="${server.id}" title="Collect Metrics Now">
@@ -571,7 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.serversTableBody.innerHTML = rowsHtml;
 
-    // Attach row button events
+    // Row Buttons Event Binding
     el.serversTableBody.querySelectorAll('.btn-server-details').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = parseInt(btn.getAttribute('data-id'), 10);
@@ -589,7 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const res = await testServerSSH(id);
           if (res.success) {
-            showToast(`SSH Test Success: Connected to ${res.hostname || 'server'}`, 'success');
+            showToast(`Connected to ${res.hostname || 'server'} successfully.`, 'success');
           } else {
             showToast(`SSH Test Failed: ${res.message}`, 'danger');
           }
@@ -613,7 +721,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const res = await collectServerMetricsNow(id);
           if (res.success) {
-            showToast('Live metrics collected successfully!', 'success');
+            showToast('Metrics collected successfully!', 'success');
           } else {
             showToast(`Collection failed: ${res.message}`, 'danger');
           }
@@ -627,6 +735,372 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+  // ================= RENDER LEVEL 4A: RESOURCE OVERVIEW WITH SPARKLINE CHARTS =================
+
+  function renderResourceOverview(stats) {
+    if (!stats) return;
+
+    // CPU
+    if (el.overviewCpuVal) el.overviewCpuVal.textContent = `${Number(stats.avg_cpu || 0).toFixed(1)}%`;
+    if (el.overviewCpuStatus) {
+      const cpu = stats.avg_cpu || 0;
+      el.overviewCpuStatus.textContent = cpu >= 90 ? 'Critical' : cpu >= 70 ? 'Warning' : 'Healthy';
+      el.overviewCpuStatus.className = `badge ${cpu >= 90 ? 'badge-soft-danger' : cpu >= 70 ? 'badge-soft-warning' : 'badge-soft-success'}`;
+    }
+    if (el.overviewCpuDelta) {
+      updateDeltaBadgeEl(el.overviewCpuDelta, stats.avg_cpu_delta || 0, '%');
+    }
+
+    // Memory
+    if (el.overviewMemVal) el.overviewMemVal.textContent = `${Number(stats.avg_memory || 0).toFixed(1)}%`;
+    if (el.overviewMemStatus) {
+      const mem = stats.avg_memory || 0;
+      el.overviewMemStatus.textContent = mem >= 90 ? 'Critical' : mem >= 70 ? 'Warning' : 'Healthy';
+      el.overviewMemStatus.className = `badge ${mem >= 90 ? 'badge-soft-danger' : mem >= 70 ? 'badge-soft-warning' : 'badge-soft-success'}`;
+    }
+    if (el.overviewMemDelta) {
+      updateDeltaBadgeEl(el.overviewMemDelta, stats.avg_memory_delta || 0, '%');
+    }
+
+    // Disk
+    if (el.overviewDiskVal) el.overviewDiskVal.textContent = `${Number(stats.avg_disk || 0).toFixed(1)}%`;
+    if (el.overviewDiskStatus) {
+      const disk = stats.avg_disk || 0;
+      el.overviewDiskStatus.textContent = disk >= 90 ? 'Critical' : disk >= 80 ? 'Warning' : 'Healthy';
+      el.overviewDiskStatus.className = `badge ${disk >= 90 ? 'badge-soft-danger' : disk >= 80 ? 'badge-soft-warning' : 'badge-soft-success'}`;
+    }
+
+    // Network
+    if (el.overviewNetVal) {
+      let rxRate = 0;
+      let txRate = 0;
+      if (state.servers.length > 0) {
+        state.servers.forEach(s => {
+          if (s.latest_metrics && s.latest_metrics.network) {
+            rxRate += s.latest_metrics.network.receive_rate_kbps || 0;
+            txRate += s.latest_metrics.network.transmit_rate_kbps || 0;
+          }
+        });
+      }
+      el.overviewNetVal.innerHTML = `
+        <div class="font-monospace">↓ ${Number(rxRate).toFixed(1)} KB/s</div>
+        <div class="font-monospace text-muted fs-6">↑ ${Number(txRate).toFixed(1)} KB/s</div>
+      `;
+    }
+
+    // Render Sparklines
+    renderSparklines(stats.resource_sparklines);
+  }
+
+  function renderSparklines(sparklinesData) {
+    if (!window.Chart || !sparklinesData) return;
+
+    const createMiniSparkline = (canvasId, key, dataArray, color) => {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const sparkTension = (state.chartModel === 'smooth') ? 0.35 : 0;
+      const sparkStepped = (state.chartModel === 'stepped') ? 'middle' : false;
+
+      if (state.sparklines[key]) {
+        state.sparklines[key].data.labels = dataArray.map((_, i) => i);
+        state.sparklines[key].data.datasets[0].data = dataArray;
+        state.sparklines[key].data.datasets[0].tension = sparkTension;
+        state.sparklines[key].data.datasets[0].stepped = sparkStepped;
+        state.sparklines[key].update('none');
+        return;
+      }
+
+      state.sparklines[key] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: dataArray.map((_, i) => i),
+          datasets: [{
+            data: dataArray,
+            borderColor: color,
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            fill: true,
+            backgroundColor: `${color}20`,
+            tension: sparkTension,
+            stepped: sparkStepped,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: {
+            x: { display: false },
+            y: { display: false, min: 0 },
+          },
+        },
+      });
+    };
+
+    if (sparklinesData.cpu && sparklinesData.cpu.length > 0) {
+      createMiniSparkline('sparkline-cpu', 'cpu', sparklinesData.cpu, '#6366f1');
+    }
+    if (sparklinesData.memory && sparklinesData.memory.length > 0) {
+      createMiniSparkline('sparkline-memory', 'memory', sparklinesData.memory, '#10b981');
+    }
+    if (sparklinesData.disk && sparklinesData.disk.length > 0) {
+      createMiniSparkline('sparkline-disk', 'disk', sparklinesData.disk, '#f59e0b');
+    }
+    if (sparklinesData.network && sparklinesData.network.length > 0) {
+      createMiniSparkline('sparkline-network', 'network', sparklinesData.network, '#0ea5e9');
+    }
+  }
+
+  // ================= RENDER LEVEL 4B: RESOURCE HEALTH HEATMAP (PHASE 10) =================
+
+  function renderResourceHeatmap() {
+    if (!el.heatmapTableBody) return;
+
+    if (state.servers.length === 0) {
+      el.heatmapTableBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No servers registered.</td></tr>';
+      return;
+    }
+
+    const rowsHtml = state.servers.map(server => {
+      const isDown = server.status === 'DOWN';
+      const m = server.latest_metrics;
+
+      const getChip = (pct, warnThreshold = 70, critThreshold = 90) => {
+        if (isDown || typeof pct !== 'number') return '<span class="badge-heatmap-offline">--</span>';
+        if (pct >= critThreshold) return `<span class="badge-heatmap-high">${pct}% High</span>`;
+        if (pct >= warnThreshold) return `<span class="badge-heatmap-warn">${pct}% Warn</span>`;
+        return `<span class="badge-heatmap-good">${pct}% Good</span>`;
+      };
+
+      const cpuChip = m && m.cpu ? getChip(m.cpu.usage_percent, 70, 90) : (isDown ? '<span class="badge-heatmap-offline">--</span>' : '<span class="badge-heatmap-offline">--</span>');
+      const memChip = m && m.memory ? getChip(m.memory.usage_percent, 75, 90) : (isDown ? '<span class="badge-heatmap-offline">--</span>' : '<span class="badge-heatmap-offline">--</span>');
+      const diskChip = m && m.disk ? getChip(m.disk.usage_percent, 80, 90) : (isDown ? '<span class="badge-heatmap-offline">--</span>' : '<span class="badge-heatmap-offline">--</span>');
+      const netChip = isDown
+        ? '<span class="badge-heatmap-offline">Offline</span>'
+        : server.status === 'UP'
+        ? '<span class="badge-heatmap-good">Good</span>'
+        : '<span class="badge-heatmap-warn">Degraded</span>';
+
+      return `
+        <tr>
+          <td>
+            <span class="fw-bold">${escapeHtml(server.server_name)}</span>
+            <span class="text-muted small font-monospace ms-1">(${escapeHtml(server.hostname)})</span>
+          </td>
+          <td class="text-center">${cpuChip}</td>
+          <td class="text-center">${memChip}</td>
+          <td class="text-center">${diskChip}</td>
+          <td class="text-center">${netChip}</td>
+        </tr>
+      `;
+    }).join('');
+
+    el.heatmapTableBody.innerHTML = rowsHtml;
+  }
+
+  // ================= RENDER LEVEL 5: ALERT CENTER & ACTION CENTER =================
+
+  function renderAlertCenter() {
+    if (!el.alertsListContainer) return;
+
+    let filtered = [...state.alerts];
+
+    if (state.currentAlertFilter === 'ACTIVE') {
+      filtered = filtered.filter(a => a.status === 'ACTIVE');
+    } else if (state.currentAlertFilter === 'CRITICAL') {
+      filtered = filtered.filter(a => a.severity === 'CRITICAL' && a.status === 'ACTIVE');
+    } else if (state.currentAlertFilter === 'WARNING') {
+      filtered = filtered.filter(a => a.severity === 'WARNING' && a.status === 'ACTIVE');
+    } else if (state.currentAlertFilter === 'RESOLVED') {
+      filtered = filtered.filter(a => a.status === 'RESOLVED');
+    }
+
+    if (filtered.length === 0) {
+      el.alertsListContainer.innerHTML = '';
+      if (el.alertsEmptyState) el.alertsEmptyState.classList.remove('d-none');
+      return;
+    }
+
+    if (el.alertsEmptyState) el.alertsEmptyState.classList.add('d-none');
+
+    const html = filtered.map(alert => {
+      const isCritical = alert.severity === 'CRITICAL';
+      const isWarning = alert.severity === 'WARNING';
+      const severityClass = isCritical ? 'critical' : isWarning ? 'warning' : 'info';
+      const severityBadge = isCritical
+        ? '<span class="badge bg-danger">CRITICAL</span>'
+        : isWarning
+        ? '<span class="badge bg-warning text-dark">WARNING</span>'
+        : '<span class="badge bg-info">INFO</span>';
+
+      const resolveBtn = alert.status === 'ACTIVE'
+        ? `<button class="btn btn-sm btn-outline-success btn-resolve-alert" data-id="${alert.id}">
+             <i class="bi bi-check-lg me-1"></i> Resolve
+           </button>`
+        : `<span class="text-muted small"><i class="bi bi-check2-all text-success me-1"></i>Resolved</span>`;
+
+      return `
+        <div class="alert-item-card ${severityClass}" id="alert-card-${alert.id}">
+          <div class="d-flex align-items-start gap-2 flex-grow-1">
+            <div class="mt-1">${severityBadge}</div>
+            <div>
+              <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                <span class="fw-bold text-light">${escapeHtml(alert.title)}</span>
+                <span class="badge badge-soft-info">${escapeHtml(alert.server_name)}</span>
+              </div>
+              <p class="text-muted small mb-1">${escapeHtml(alert.message || 'No additional diagnostic details.')}</p>
+              <div class="text-muted" style="font-size: 0.72rem;">
+                <i class="bi bi-clock me-1"></i> Triggered ${formatRelativeTime(alert.created_at)}
+              </div>
+            </div>
+          </div>
+          <div class="align-self-center">
+            ${resolveBtn}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    el.alertsListContainer.innerHTML = html;
+
+    el.alertsListContainer.querySelectorAll('.btn-resolve-alert').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = parseInt(btn.getAttribute('data-id'), 10);
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+
+        try {
+          await resolveAlert(id);
+          showToast('Alert resolved.', 'success');
+          await refreshAll(true);
+        } catch (err) {
+          showToast(`Error resolving: ${err.message}`, 'danger');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Resolve';
+        }
+      });
+    });
+  }
+
+  function renderActionCenter(tasks) {
+    if (!el.actionTasksContainer) return;
+
+    if (!tasks || tasks.length === 0) {
+      el.actionTasksContainer.innerHTML = `
+        <div class="p-3 text-center text-muted">
+          <i class="bi bi-check-circle text-success fs-3 mb-1 d-block"></i>
+          <span>No operational tasks pending. All infrastructure checks healthy.</span>
+        </div>
+      `;
+      return;
+    }
+
+    const html = tasks.map(task => {
+      const p = (task.priority || 'INFO').toUpperCase();
+      const priorityClass = p === 'URGENT' ? 'priority-urgent' : p === 'HIGH' ? 'priority-high' : p === 'MEDIUM' ? 'priority-medium' : 'priority-info';
+      const badgeClass = p === 'URGENT' ? 'bg-danger' : p === 'HIGH' ? 'bg-warning text-dark' : p === 'MEDIUM' ? 'bg-info' : 'bg-success';
+
+      let actionBtn = '';
+      if (task.action_type === 'test_ssh' && task.server_id) {
+        actionBtn = `<button class="btn btn-sm btn-danger btn-task-action" data-action="test_ssh" data-server-id="${task.server_id}">
+          <i class="bi bi-plug-fill me-1"></i> ${escapeHtml(task.action_label || 'Test SSH')}
+        </button>`;
+      } else if (task.action_type === 'view_details' && task.server_id) {
+        actionBtn = `<button class="btn btn-sm btn-outline-warning btn-task-action" data-action="view_details" data-server-id="${task.server_id}">
+          <i class="bi bi-eye-fill me-1"></i> ${escapeHtml(task.action_label || 'Inspect')}
+        </button>`;
+      } else if (task.action_type === 'collect_metrics' && task.server_id) {
+        actionBtn = `<button class="btn btn-sm btn-outline-primary btn-task-action" data-action="collect_metrics" data-server-id="${task.server_id}">
+          <i class="bi bi-arrow-repeat me-1"></i> ${escapeHtml(task.action_label || 'Collect')}
+        </button>`;
+      } else {
+        actionBtn = `<span class="badge badge-soft-success font-monospace">${escapeHtml(task.action_label || 'Clear')}</span>`;
+      }
+
+      return `
+        <div class="task-item-card ${priorityClass}">
+          <div class="d-flex align-items-start gap-2 flex-grow-1">
+            <span class="badge ${badgeClass} mt-1">${p}</span>
+            <div>
+              <div class="fw-bold text-light">${escapeHtml(task.title)}</div>
+              <div class="text-muted small font-monospace">
+                ${escapeHtml(task.server_name)} &bull; ${escapeHtml(task.hostname)}
+              </div>
+            </div>
+          </div>
+          <div class="ms-2">
+            ${actionBtn}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    el.actionTasksContainer.innerHTML = html;
+
+    // Attach task action events
+    el.actionTasksContainer.querySelectorAll('.btn-task-action').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const action = btn.getAttribute('data-action');
+        const serverId = parseInt(btn.getAttribute('data-server-id'), 10);
+        if (!serverId) return;
+
+        if (action === 'view_details') {
+          openServerDetailModal(serverId);
+        } else if (action === 'test_ssh') {
+          openServerDetailModal(serverId);
+          if (el.btnModalTestSsh) el.btnModalTestSsh.click();
+        } else if (action === 'collect_metrics') {
+          btn.disabled = true;
+          try {
+            await collectServerMetricsNow(serverId);
+            showToast('Metrics collected successfully.', 'success');
+            await refreshAll(true);
+          } catch (err) {
+            showToast(`Collection failed: ${err.message}`, 'danger');
+          } finally {
+            btn.disabled = false;
+          }
+        }
+      });
+    });
+  }
+
+  // ================= RENDER LEVEL 6: MONITORING ENGINE STATUS =================
+
+  function renderMonitoringEngine(engine) {
+    if (!engine) return;
+
+    if (el.engineServiceStatus) {
+      el.engineServiceStatus.innerHTML = `<span class="status-dot online"></span> ${escapeHtml(engine.service_status || 'Running')}`;
+    }
+    if (el.engineSchedulerStatus) {
+      el.engineSchedulerStatus.innerHTML = `<span class="status-dot online"></span> ${escapeHtml(engine.scheduler_status || 'Active')}`;
+    }
+    if (el.engineRunnerStatus) {
+      const isHealthy = (engine.runner_status || '').toLowerCase() === 'healthy';
+      el.engineRunnerStatus.innerHTML = `<span class="status-dot ${isHealthy ? 'online' : 'warning'}"></span> ${escapeHtml(engine.runner_status || 'Healthy')}`;
+    }
+    if (el.engineLastSuccess) {
+      el.engineLastSuccess.textContent = engine.last_successful_run ? formatTimeOnly(engine.last_successful_run) : 'Never';
+    }
+    if (el.engineLastFail) {
+      el.engineLastFail.textContent = engine.last_failed_run ? formatTimeOnly(engine.last_failed_run) : 'None';
+      el.engineLastFail.className = engine.last_failed_run ? 'engine-value font-monospace small text-danger' : 'engine-value font-monospace small text-muted';
+    }
+    if (el.engineLastCheck) {
+      el.engineLastCheck.textContent = engine.last_check ? formatTimeOnly(engine.last_check) : '--:--:--';
+    }
+    if (el.engineNextRefresh) {
+      el.engineNextRefresh.textContent = `${state.countdownSeconds}s`;
+    }
+  }
+
+  // ================= RENDER LEVEL 7: HISTORICAL METRICS =================
 
   function populateServerSelect() {
     if (!el.chartServerSelect) return;
@@ -653,8 +1127,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ================= CHART CONTROLLER =================
-
   function getChartThemeColors() {
     const isDark = state.theme === 'dark';
     return {
@@ -666,19 +1138,74 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  async function updateCharts() {
+  function createChartOptions(theme, unit = '%', bounds = null) {
+    let yMin = 0;
+    let yMax = undefined;
+    let decimals = 0;
+
+    if (bounds) {
+      yMin = (bounds.min !== undefined) ? bounds.min : 0;
+      yMax = bounds.max;
+      decimals = bounds.decimals || 0;
+    }
+
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: theme.textColor, boxWidth: 12, font: { size: 11 } },
+        },
+        tooltip: {
+          backgroundColor: theme.tooltipBg,
+          titleColor: theme.tooltipText,
+          bodyColor: theme.tooltipText,
+          borderColor: theme.tooltipBorder,
+          borderWidth: 1,
+          padding: 8,
+          callbacks: {
+            label: function(ctx) {
+              const val = ctx.parsed.y;
+              return ` ${ctx.dataset.label}: ${Number(val).toFixed(decimals > 0 ? decimals : 2)}${unit}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: theme.gridColor },
+          ticks: { color: theme.textColor, maxRotation: 0, autoSkip: true, maxTicksLimit: 6, font: { size: 10 } },
+        },
+        y: {
+          min: yMin,
+          max: yMax,
+          grid: { color: theme.gridColor },
+          ticks: {
+            color: theme.textColor,
+            font: { size: 10 },
+            callback: (v) => `${Number(v).toFixed(decimals)}${unit}`,
+          },
+        },
+      },
+    };
+  }
+
+  async function updateHistoricalCharts() {
     if (!state.selectedServerId) return;
 
     try {
       const data = await fetchServerMetrics(state.selectedServerId, state.selectedRange);
       renderChartsData(data);
     } catch (err) {
-      console.warn('Error updating charts:', err);
+      console.warn('Error updating historical charts:', err);
     }
   }
 
   function renderChartsData(data) {
-    if (!window.Chart) return;
+    if (!window.Chart || !data) return;
     const theme = getChartThemeColors();
 
     const formattedLabels = (data.labels || []).map(l => {
@@ -687,26 +1214,103 @@ document.addEventListener('DOMContentLoaded', () => {
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     });
 
-    // Update badges
-    const latestCpu = data.cpu && data.cpu.length > 0 ? data.cpu[data.cpu.length - 1] : 0;
-    const latestMem = data.memory && data.memory.length > 0 ? data.memory[data.memory.length - 1] : 0;
-    const latestDisk = data.disk && data.disk.length > 0 ? data.disk[data.disk.length - 1] : 0;
-    const latestNetRx = data.network_rx && data.network_rx.length > 0 ? data.network_rx[data.network_rx.length - 1] : 0;
-    const latestNetTx = data.network_tx && data.network_tx.length > 0 ? data.network_tx[data.network_tx.length - 1] : 0;
+    const s = data.summary || {};
 
-    if (el.badgeCpu) el.badgeCpu.textContent = `${Number(latestCpu).toFixed(1)}%`;
-    if (el.badgeMem) el.badgeMem.textContent = `${Number(latestMem).toFixed(1)}%`;
-    if (el.badgeDisk) el.badgeDisk.textContent = `${Number(latestDisk).toFixed(1)}%`;
-    if (el.badgeNet) el.badgeNet.textContent = `↓${Number(latestNetRx).toFixed(1)} ↑${Number(latestNetTx).toFixed(1)} KB/s`;
-
-    if (data.deltas) {
-      updateDeltaBadgeEl(el.deltaCpuBadge, data.deltas.cpu, '%');
-      updateDeltaBadgeEl(el.deltaMemBadge, data.deltas.memory, '%');
-      updateDeltaBadgeEl(el.deltaDiskBadge, data.deltas.disk, '%');
-      updateDeltaBadgeEl(el.deltaNetBadge, data.deltas.network_rx, ' KB/s');
+    // Update Badges
+    if (s.cpu) {
+      if (el.statCpuCurrent) el.statCpuCurrent.innerHTML = `Cur: <strong>${s.cpu.current}%</strong>`;
+      if (el.statCpuAvg) el.statCpuAvg.innerHTML = `Avg: <strong>${s.cpu.avg}%</strong>`;
+      if (el.statCpuPeak) el.statCpuPeak.innerHTML = `Peak: <strong>${s.cpu.peak}%</strong>`;
+    }
+    if (s.memory) {
+      if (el.statMemCurrent) el.statMemCurrent.innerHTML = `Cur: <strong>${s.memory.current}%</strong>`;
+      if (el.statMemAvg) el.statMemAvg.innerHTML = `Avg: <strong>${s.memory.avg}%</strong>`;
+      if (el.statMemPeak) el.statMemPeak.innerHTML = `Peak: <strong>${s.memory.peak}%</strong>`;
+    }
+    if (s.disk) {
+      if (el.statDiskCurrent) el.statDiskCurrent.innerHTML = `Cur: <strong>${s.disk.current}%</strong>`;
+      if (el.statDiskAvg) el.statDiskAvg.innerHTML = `Avg: <strong>${s.disk.avg}%</strong>`;
+      if (el.statDiskPeak) el.statDiskPeak.innerHTML = `Peak: <strong>${s.disk.peak}%</strong>`;
+    }
+    if (s.network_rx) {
+      if (el.statNetCurrent) el.statNetCurrent.innerHTML = `Cur: <strong>${s.network_rx.current} KB/s</strong>`;
+      if (el.statNetAvg) el.statNetAvg.innerHTML = `Avg: <strong>${s.network_rx.avg} KB/s</strong>`;
+      if (el.statNetPeak) el.statNetPeak.innerHTML = `Peak: <strong>${s.network_rx.peak} KB/s</strong>`;
     }
 
-    const pointRadius = (data.cpu || []).length > 60 ? 2 : 4;
+    // Chart Model Configuration: Zigzag (sharp point-to-point) / Smooth / Stepped
+    const chartModel = state.chartModel || 'zigzag';
+    const isZigzag = (chartModel === 'zigzag');
+    const isStepped = (chartModel === 'stepped');
+
+    const tension = isZigzag ? 0 : (isStepped ? 0 : 0.35);
+    const stepped = isStepped ? 'middle' : false;
+    const pointRadius = isZigzag
+      ? ((data.cpu || []).length > 60 ? 2.5 : 4)
+      : (isStepped ? 0 : ((data.cpu || []).length > 60 ? 2 : 3));
+    const pointHoverRadius = isZigzag ? 6 : 5;
+
+    // Calculate adaptive bounds if state.chartScaleMode === 'dynamic'
+    const isDynamic = (state.chartScaleMode === 'dynamic');
+
+    // CPU Bounds
+    let cpuBounds = { min: 0, max: 100, decimals: 0 };
+    if (isDynamic) {
+      const cpuVals = [...(data.cpu || []), ...(data.load_1m || [])].filter(v => typeof v === 'number' && !isNaN(v));
+      const peakCpu = cpuVals.length > 0 ? Math.max(...cpuVals) : 0;
+      if (peakCpu <= 1.0) {
+        cpuBounds = { min: 0, max: 1.0, decimals: 1 };
+      } else if (peakCpu <= 5.0) {
+        cpuBounds = { min: 0, max: Math.max(1, Math.ceil(peakCpu * 1.3 * 10) / 10), decimals: 1 };
+      } else if (peakCpu <= 25.0) {
+        cpuBounds = { min: 0, max: Math.min(100, Math.ceil(peakCpu * 1.25 / 5) * 5), decimals: 0 };
+      } else {
+        cpuBounds = { min: 0, max: Math.min(100, Math.ceil(peakCpu * 1.15 / 10) * 10), decimals: 0 };
+      }
+    }
+
+    // Memory Bounds
+    let memBounds = { min: 0, max: 100, decimals: 0 };
+    if (isDynamic) {
+      const memVals = (data.memory || []).filter(v => typeof v === 'number' && !isNaN(v));
+      if (memVals.length > 0) {
+        const minMem = Math.min(...memVals);
+        const maxMem = Math.max(...memVals);
+        const delta = maxMem - minMem;
+        if (delta < 5) {
+          const yMin = Math.max(0, Math.floor(minMem - 2));
+          const yMax = Math.min(100, Math.ceil(maxMem + 2));
+          memBounds = { min: yMin, max: yMax, decimals: 1 };
+        } else if (maxMem <= 40) {
+          memBounds = { min: 0, max: Math.min(100, Math.ceil(maxMem * 1.25 / 5) * 5), decimals: 0 };
+        } else {
+          memBounds = { min: 0, max: Math.min(100, Math.ceil(maxMem * 1.15 / 10) * 10), decimals: 0 };
+        }
+      }
+    }
+
+    // Disk Bounds
+    let diskBounds = { min: 0, max: 100, decimals: 0 };
+    if (isDynamic) {
+      const diskVals = (data.disk || []).filter(v => typeof v === 'number' && !isNaN(v));
+      if (diskVals.length > 0) {
+        const maxDisk = Math.max(...diskVals);
+        if (maxDisk <= 5) {
+          diskBounds = { min: 0, max: 10, decimals: 0 };
+        } else if (maxDisk <= 50) {
+          diskBounds = { min: 0, max: Math.ceil(maxDisk * 1.25 / 5) * 5, decimals: 0 };
+        }
+      }
+    }
+
+    // Network Bounds
+    const netVals = [...(data.network_rx || []), ...(data.network_tx || [])].filter(v => typeof v === 'number' && !isNaN(v));
+    const maxNet = netVals.length > 0 ? Math.max(...netVals) : 0;
+    const netBounds = {
+      min: 0,
+      max: maxNet > 0 ? Math.ceil(maxNet * 1.25 * 10) / 10 : 2,
+      decimals: 1,
+    };
 
     // 1. CPU Chart
     const cpuCtx = document.getElementById('chart-cpu')?.getContext('2d');
@@ -723,10 +1327,11 @@ document.addEventListener('DOMContentLoaded', () => {
               borderColor: '#6366f1',
               backgroundColor: 'rgba(99, 102, 241, 0.15)',
               borderWidth: 2,
-              tension: 0.35,
+              tension: tension,
+              stepped: stepped,
               fill: true,
               pointRadius: pointRadius,
-              pointHoverRadius: 6,
+              pointHoverRadius: pointHoverRadius,
             },
             {
               label: '1m Load Average',
@@ -734,13 +1339,15 @@ document.addEventListener('DOMContentLoaded', () => {
               borderColor: '#f59e0b',
               borderDash: [4, 4],
               borderWidth: 1.5,
-              tension: 0.35,
+              tension: tension,
+              stepped: stepped,
               fill: false,
-              pointRadius: 0,
+              pointRadius: isZigzag ? 2.5 : 0,
+              pointHoverRadius: isZigzag ? 4 : 0,
             },
           ],
         },
-        options: createChartOptions(theme, '%', [0, 100]),
+        options: createChartOptions(theme, '%', cpuBounds),
       });
     }
 
@@ -752,21 +1359,20 @@ document.addEventListener('DOMContentLoaded', () => {
         type: 'line',
         data: {
           labels: formattedLabels,
-          datasets: [
-            {
-              label: 'Memory Usage (%)',
-              data: data.memory || [],
-              borderColor: '#10b981',
-              backgroundColor: 'rgba(16, 185, 129, 0.15)',
-              borderWidth: 2,
-              tension: 0.35,
-              fill: true,
-              pointRadius: pointRadius,
-              pointHoverRadius: 6,
-            },
-          ],
+          datasets: [{
+            label: 'Memory Usage (%)',
+            data: data.memory || [],
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+            borderWidth: 2,
+            tension: tension,
+            stepped: stepped,
+            fill: true,
+            pointRadius: pointRadius,
+            pointHoverRadius: pointHoverRadius,
+          }],
         },
-        options: createChartOptions(theme, '%', [0, 100]),
+        options: createChartOptions(theme, '%', memBounds),
       });
     }
 
@@ -778,21 +1384,20 @@ document.addEventListener('DOMContentLoaded', () => {
         type: 'line',
         data: {
           labels: formattedLabels,
-          datasets: [
-            {
-              label: 'Disk Usage (%)',
-              data: data.disk || [],
-              borderColor: '#f59e0b',
-              backgroundColor: 'rgba(245, 158, 11, 0.15)',
-              borderWidth: 2,
-              tension: 0.35,
-              fill: true,
-              pointRadius: pointRadius,
-              pointHoverRadius: 6,
-            },
-          ],
+          datasets: [{
+            label: 'Disk Usage (%)',
+            data: data.disk || [],
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.15)',
+            borderWidth: 2,
+            tension: tension,
+            stepped: stepped,
+            fill: true,
+            pointRadius: pointRadius,
+            pointHoverRadius: pointHoverRadius,
+          }],
         },
-        options: createChartOptions(theme, '%', [0, 100]),
+        options: createChartOptions(theme, '%', diskBounds),
       });
     }
 
@@ -806,180 +1411,39 @@ document.addEventListener('DOMContentLoaded', () => {
           labels: formattedLabels,
           datasets: [
             {
-              label: 'Receive Rate (KB/s)',
+              label: 'RX (KB/s)',
               data: data.network_rx || [],
               borderColor: '#0ea5e9',
-              backgroundColor: 'rgba(14, 165, 233, 0.1)',
+              backgroundColor: 'rgba(14, 165, 233, 0.15)',
               borderWidth: 2,
-              tension: 0.35,
+              tension: tension,
+              stepped: stepped,
               fill: true,
               pointRadius: pointRadius,
-              pointHoverRadius: 6,
+              pointHoverRadius: pointHoverRadius,
             },
             {
-              label: 'Transmit Rate (KB/s)',
+              label: 'TX (KB/s)',
               data: data.network_tx || [],
-              borderColor: '#a855f7',
-              backgroundColor: 'rgba(168, 85, 247, 0.1)',
-              borderWidth: 2,
-              tension: 0.35,
-              fill: true,
-              pointRadius: pointRadius,
-              pointHoverRadius: 6,
+              borderColor: '#8b5cf6',
+              borderWidth: 1.5,
+              borderDash: [3, 3],
+              tension: tension,
+              stepped: stepped,
+              fill: false,
+              pointRadius: isZigzag ? 2.5 : 0,
+              pointHoverRadius: isZigzag ? 4 : 0,
             },
           ],
         },
-        options: createChartOptions(theme, ' KB/s'),
+        options: createChartOptions(theme, ' KB/s', netBounds),
       });
     }
   }
 
-  function createChartOptions(theme, unit = '', suggestedRange = null) {
-    const scales = {
-      x: {
-        grid: { color: theme.gridColor },
-        ticks: { color: theme.textColor, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
-      },
-      y: {
-        grid: { color: theme.gridColor },
-        ticks: {
-          color: theme.textColor,
-          callback: (value) => `${value}${unit}`,
-        },
-      },
-    };
+  // ================= RENDER LEVEL 8: RECENT ACTIVITY =================
 
-    if (suggestedRange) {
-      scales.y.suggestedMin = suggestedRange[0];
-      scales.y.suggestedMax = suggestedRange[1];
-    }
-
-    return {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {
-        mode: 'index',
-        intersect: false,
-      },
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          align: 'end',
-          labels: {
-            boxWidth: 12,
-            color: theme.textColor,
-            font: { size: 11 },
-          },
-        },
-        tooltip: {
-          backgroundColor: theme.tooltipBg,
-          titleColor: theme.tooltipText,
-          bodyColor: theme.tooltipText,
-          borderColor: theme.tooltipBorder,
-          borderWidth: 1,
-          padding: 10,
-          callbacks: {
-            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y}${unit}`,
-          },
-        },
-      },
-      scales,
-    };
-  }
-
-  // ================= ALERTS RENDER =================
-
-  function renderAlertsList() {
-    if (!el.alertsListContainer) return;
-
-    let filtered = state.alerts;
-
-    if (state.currentAlertFilter === 'ACTIVE') {
-      filtered = filtered.filter(a => a.status === 'ACTIVE');
-    } else if (state.currentAlertFilter === 'RESOLVED') {
-      filtered = filtered.filter(a => a.status === 'RESOLVED');
-    } else if (state.currentAlertFilter === 'CRITICAL') {
-      filtered = filtered.filter(a => a.severity === 'CRITICAL' && a.status === 'ACTIVE');
-    } else if (state.currentAlertFilter === 'WARNING') {
-      filtered = filtered.filter(a => a.severity === 'WARNING' && a.status === 'ACTIVE');
-    }
-
-    if (filtered.length === 0) {
-      el.alertsListContainer.innerHTML = '';
-      if (el.alertsEmptyState) el.alertsEmptyState.classList.remove('d-none');
-      return;
-    }
-
-    if (el.alertsEmptyState) el.alertsEmptyState.classList.add('d-none');
-
-    const alertsHtml = filtered.map(alert => {
-      const severityClass = (alert.severity || '').toLowerCase();
-      const severityBadge =
-        alert.severity === 'CRITICAL' ? '<span class="badge bg-danger">CRITICAL</span>' :
-        alert.severity === 'WARNING' ? '<span class="badge bg-warning text-dark">WARNING</span>' :
-        '<span class="badge bg-info">INFO</span>';
-
-      const statusBadge =
-        alert.status === 'ACTIVE' ? '<span class="badge badge-soft-danger">ACTIVE</span>' :
-        '<span class="badge badge-soft-success">RESOLVED</span>';
-
-      const resolveBtn = alert.status === 'ACTIVE'
-        ? `<button class="btn btn-sm btn-outline-success btn-resolve-alert" data-id="${alert.id}">
-             <i class="bi bi-check-lg me-1"></i> Resolve
-           </button>`
-        : `<span class="text-muted small"><i class="bi bi-check2-all text-success me-1"></i>Resolved</span>`;
-
-      return `
-        <div class="alert-item-card ${severityClass}" id="alert-card-${alert.id}">
-          <div class="d-flex align-items-start gap-3 flex-grow-1">
-            <div class="mt-1">
-              ${severityBadge}
-            </div>
-            <div>
-              <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="fw-bold text-light">${escapeHtml(alert.title)}</span>
-                <span class="badge badge-soft-info">${escapeHtml(alert.server_name)}</span>
-                ${statusBadge}
-              </div>
-              <p class="text-muted small mb-1">${escapeHtml(alert.message || 'No additional details.')}</p>
-              <div class="text-muted" style="font-size: 0.72rem;">
-                <i class="bi bi-clock me-1"></i> Triggered ${formatRelativeTime(alert.created_at)}
-              </div>
-            </div>
-          </div>
-          <div class="align-self-center">
-            ${resolveBtn}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    el.alertsListContainer.innerHTML = alertsHtml;
-
-    // Attach resolve button events
-    el.alertsListContainer.querySelectorAll('.btn-resolve-alert').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = parseInt(btn.getAttribute('data-id'), 10);
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
-
-        try {
-          await resolveAlert(id);
-          showToast('Alert resolved successfully.', 'success');
-          await refreshAll(true);
-        } catch (err) {
-          showToast(`Error resolving alert: ${err.message}`, 'danger');
-          btn.disabled = false;
-          btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Resolve';
-        }
-      });
-    });
-  }
-
-  // ================= SYSTEM ACTIVITY LOG =================
-
-  function renderActivityLog(recentActivity = null, isLiveRefresh = false) {
+  function renderRecentActivity(recentActivity = null) {
     if (!el.activityTableBody) return;
 
     const activityList = (recentActivity && recentActivity.length > 0)
@@ -989,82 +1453,36 @@ document.addEventListener('DOMContentLoaded', () => {
         : null;
 
     if (!activityList || activityList.length === 0) {
-      if (state.servers.length === 0) {
-        el.activityTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No monitoring activity recorded yet.</td></tr>';
-        return;
-      }
-
-      // Fallback to current server fleet state
-      const rows = state.servers.map(s => {
-        const isUp = s.status === 'UP';
-        const resultBadge = isUp
-          ? '<span class="badge badge-soft-success font-monospace"><i class="bi bi-check2 me-1"></i>200 OK</span>'
-          : `<span class="badge badge-soft-danger font-monospace" title="${escapeHtml(s.last_error)}"><i class="bi bi-x me-1"></i>Failed</span>`;
-        const m = s.latest_metrics;
-        const cpuV = m && m.cpu ? m.cpu.usage_percent : 0;
-        const memV = m && m.memory ? m.memory.usage_percent : 0;
-        const diskV = m && m.disk ? m.disk.usage_percent : 0;
-        const rxV = m && m.network ? m.network.receive_rate_kbps : 0;
-        const cpuDeltaPill = renderDeltaPill(m && m.cpu ? m.cpu.delta : 0, '%');
-        const memDeltaPill = renderDeltaPill(m && m.memory ? m.memory.delta : 0, '%');
-
-        return `
-          <tr>
-            <td class="font-monospace small">${s.last_check_at ? new Date(s.last_check_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'Just now'}</td>
-            <td class="fw-bold">${escapeHtml(s.server_name)} <span class="text-muted small font-monospace">(${escapeHtml(s.hostname)})</span></td>
-            <td>${isUp ? '<span class="status-dot online me-1"></span> ONLINE' : '<span class="status-dot offline me-1"></span> OFFLINE'}</td>
-            <td class="font-monospace small">
-              <span class="text-info">CPU: ${cpuV}%</span> | 
-              <span class="text-success">RAM: ${memV}%</span> | 
-              <span class="text-warning">Disk: ${diskV}%</span> | 
-              <span class="text-primary">Net: ${rxV} KB/s</span>
-            </td>
-            <td>
-              <div class="d-flex align-items-center gap-1">
-                ${cpuDeltaPill} ${memDeltaPill}
-              </div>
-            </td>
-            <td>${resultBadge}</td>
-          </tr>
-        `;
-      }).join('');
-      el.activityTableBody.innerHTML = rows;
+      el.activityTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No monitoring activity recorded yet.</td></tr>';
       return;
     }
 
-    const rows = activityList.map((item, idx) => {
+    const rows = activityList.map(item => {
       const isUp = item.status === 'UP';
       const resultBadge = isUp
         ? '<span class="badge badge-soft-success font-monospace"><i class="bi bi-check2-circle me-1"></i>200 OK</span>'
-        : `<span class="badge badge-soft-danger font-monospace" title="${escapeHtml(item.result || 'Poll failed')}"><i class="bi bi-x-circle me-1"></i>Failed</span>`;
+        : `<span class="badge badge-soft-danger font-monospace" title="${escapeHtml(item.result || 'Failed')}"><i class="bi bi-x-circle me-1"></i>Failed</span>`;
 
       const d = item.timestamp ? new Date(item.timestamp) : null;
       const timeStr = d && !isNaN(d.getTime())
         ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
         : 'Recently';
-      const dateStr = d && !isNaN(d.getTime())
-        ? d.toLocaleDateString()
-        : '';
 
-      const flashClass = (idx === 0 && isLiveRefresh) ? 'row-flash' : '';
       const cpuDeltaPill = renderDeltaPill(item.cpu_delta || 0, '%');
       const memDeltaPill = renderDeltaPill(item.mem_delta || 0, '%');
 
       return `
-        <tr class="${flashClass}">
-          <td class="font-monospace small">
-            <strong>${timeStr}</strong> <span class="text-muted" style="font-size: 0.72rem;">(${dateStr})</span>
-          </td>
+        <tr>
+          <td class="font-monospace small"><strong>${timeStr}</strong></td>
           <td class="fw-bold">
-            ${escapeHtml(item.server_name)} 
+            ${escapeHtml(item.server_name)}
             <span class="text-muted small font-monospace">(${escapeHtml(item.hostname)})</span>
           </td>
-          <td>${isUp ? '<span class="status-dot online me-1"></span> ONLINE' : '<span class="status-dot offline me-1"></span> OFFLINE'}</td>
+          <td>${isUp ? '<span class="status-dot online me-1"></span> Online' : '<span class="status-dot offline me-1"></span> Offline'}</td>
           <td class="font-monospace small">
             <span class="text-info">CPU: ${item.cpu_usage}%</span> | 
             <span class="text-success">RAM: ${item.memory_usage}%</span> | 
-            <span class="text-warning">Disk: ${item.disk_usage}%</span> | 
-            <span class="text-primary">Net: ${item.network_rx_kbps} KB/s</span>
+            <span class="text-warning">Disk: ${item.disk_usage}%</span>
           </td>
           <td>
             <div class="d-flex align-items-center gap-1">
@@ -1158,7 +1576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (el.modalSshOutput) {
-      el.modalSshOutput.textContent = 'Click "Test SSH Connection" to run live paramiko diagnostic test.';
+      el.modalSshOutput.textContent = 'Click "Test SSH Connection" to verify server connectivity via paramiko.';
     }
 
     if (window.bootstrap && el.modalEl) {
@@ -1167,7 +1585,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ================= REFRESH ORCHESTRATION =================
+  // ================= REFRESH ORCHESTRATION (EXACT 10 SECONDS - PHASE 17 & 18) =================
 
   async function refreshAll(silent = false) {
     if (state.isFetching) return;
@@ -1176,7 +1594,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!silent && el.refreshIcon) {
       el.refreshIcon.classList.add('spin-icon');
     }
-    if (el.refreshBtn) el.refreshBtn.disabled = true;
+    if (el.refreshStatusBadge) {
+      el.refreshStatusBadge.className = 'badge badge-soft-warning font-monospace';
+      el.refreshStatusBadge.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Updating...';
+    }
 
     try {
       const [stats, servers, alerts] = await Promise.all([
@@ -1187,21 +1608,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (el.errorBanner) el.errorBanner.classList.add('d-none');
 
+      state.stats = stats;
       state.servers = servers;
       state.alerts = alerts;
-      renderStats(stats);
-      renderLiveRefreshBanner(stats, servers);
-      renderServersTable();
+
+      renderSystemHealthBar(stats);
+      renderKpis(stats);
+      renderServerHealthMatrix();
+      renderResourceOverview(stats);
+      renderResourceHeatmap();
+      renderAlertCenter();
+      renderActionCenter(stats.tasks);
+      renderMonitoringEngine(stats.monitoring_engine);
       populateServerSelect();
-      renderAlertsList();
-      renderActivityLog(stats.recent_activity, silent);
-      await updateCharts();
+      renderRecentActivity(stats.recent_activity);
+      await updateHistoricalCharts();
+
+      if (el.refreshStatusBadge) {
+        el.refreshStatusBadge.className = 'badge badge-soft-success font-monospace';
+        el.refreshStatusBadge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Live';
+      }
 
     } catch (err) {
       console.error('Failed to refresh dashboard:', err);
       if (el.errorBanner) {
         el.errorBanner.classList.remove('d-none');
-        if (el.errorMessage) el.errorMessage.textContent = `Error loading dashboard metrics: ${err.message}`;
+        if (el.errorMessage) {
+          el.errorMessage.textContent = `Update failed (${err.message}). Using last known telemetry.`;
+        }
+      }
+      if (el.refreshStatusBadge) {
+        el.refreshStatusBadge.className = 'badge badge-soft-danger font-monospace';
+        el.refreshStatusBadge.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> Offline';
       }
     } finally {
       state.isFetching = false;
@@ -1212,25 +1650,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function startCountdown() {
     stopCountdown();
-    if (state.autoRefreshInterval <= 0) {
-      if (el.countdownSec) el.countdownSec.textContent = 'Paused';
-      return;
-    }
     state.countdownSeconds = Math.round(state.autoRefreshInterval / 1000);
     if (el.countdownSec) el.countdownSec.textContent = state.countdownSeconds;
 
     state.countdownTimer = setInterval(() => {
-      if (state.autoRefreshInterval <= 0) {
-        if (el.countdownSec) el.countdownSec.textContent = 'Paused';
-        return;
-      }
       state.countdownSeconds -= 1;
+
       if (state.countdownSeconds <= 0) {
         state.countdownSeconds = Math.round(state.autoRefreshInterval / 1000);
         if (el.countdownSec) el.countdownSec.textContent = state.countdownSeconds;
         refreshAll(true);
       } else {
         if (el.countdownSec) el.countdownSec.textContent = state.countdownSeconds;
+      }
+
+      if (el.engineNextRefresh) {
+        el.engineNextRefresh.textContent = `${state.countdownSeconds}s`;
       }
     }, 1000);
   }
@@ -1255,58 +1690,34 @@ document.addEventListener('DOMContentLoaded', () => {
       el.themeToggleIcon.className = theme === 'dark' ? 'bi bi-moon-stars' : 'bi bi-sun';
     }
 
-    updateCharts();
+    updateHistoricalCharts();
   }
 
   // ================= EVENT LISTENERS =================
 
-  // Theme Toggle
   if (el.themeToggleBtn) {
     el.themeToggleBtn.addEventListener('click', () => {
       applyTheme(state.theme === 'dark' ? 'light' : 'dark');
     });
   }
 
-  // Manual Refresh
+  // Manual Refresh Button
   if (el.refreshBtn) {
     el.refreshBtn.addEventListener('click', () => {
       state.countdownSeconds = Math.round(state.autoRefreshInterval / 1000);
       if (el.countdownSec) el.countdownSec.textContent = state.countdownSeconds;
       refreshAll(false);
-      showToast('Telemetry data refreshed.', 'info');
+      showToast('Refreshing telemetry...', 'info');
     });
   }
 
-  // Auto Refresh Interval
-  document.querySelectorAll('[data-interval]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const interval = parseInt(btn.getAttribute('data-interval'), 10);
-      state.autoRefreshInterval = interval;
-
-      document.querySelectorAll('[data-interval]').forEach(b => b.classList.remove('active-refresh'));
-      btn.classList.add('active-refresh');
-
-      if (interval === 0) {
-        if (el.autoRefreshLabel) el.autoRefreshLabel.textContent = 'Paused';
-        stopCountdown();
-        if (el.countdownSec) el.countdownSec.textContent = 'Paused';
-        showToast('Auto-refresh paused.', 'warning');
-      } else {
-        const sec = interval / 1000;
-        if (el.autoRefreshLabel) el.autoRefreshLabel.textContent = `Refresh: ${sec}s`;
-        startCountdown();
-        showToast(`Auto-refresh set to ${sec}s.`, 'info');
-      }
-    });
-  });
-
-  // Server Filter Buttons
+  // Server Filters
   document.querySelectorAll('[data-server-filter]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('[data-server-filter]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.currentServerFilter = btn.getAttribute('data-server-filter');
-      renderServersTable();
+      renderServerHealthMatrix();
     });
   });
 
@@ -1317,7 +1728,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         state.searchQuery = e.target.value;
-        renderServersTable();
+        renderServerHealthMatrix();
       }, 150);
     });
   }
@@ -1330,7 +1741,15 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('[data-server-filter]').forEach(b => {
         b.classList.toggle('active', b.getAttribute('data-server-filter') === 'ALL');
       });
-      renderServersTable();
+      renderServerHealthMatrix();
+    });
+  }
+
+  // Chart Server Select
+  if (el.chartServerSelect) {
+    el.chartServerSelect.addEventListener('change', (e) => {
+      state.selectedServerId = parseInt(e.target.value, 10);
+      updateHistoricalCharts();
     });
   }
 
@@ -1340,25 +1759,85 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('[data-range]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.selectedRange = btn.getAttribute('data-range');
-      updateCharts();
+      updateHistoricalCharts();
     });
   });
 
-  // Chart Server Select
-  if (el.chartServerSelect) {
-    el.chartServerSelect.addEventListener('change', (e) => {
-      state.selectedServerId = parseInt(e.target.value, 10);
-      updateCharts();
+  // Chart Model Buttons (Zigzag / Smooth / Stepped)
+  const modelBtns = document.querySelectorAll('#chart-model-group [data-chart-model]');
+  modelBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-chart-model') === state.chartModel);
+    btn.addEventListener('click', () => {
+      const model = btn.getAttribute('data-chart-model');
+      state.chartModel = model;
+      localStorage.setItem('dash_chart_model', model);
+      modelBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-chart-model') === model));
+      updateHistoricalCharts();
+      if (state.stats && state.stats.resource_sparklines) {
+        renderSparklines(state.stats.resource_sparklines);
+      }
+    });
+  });
+
+  // Chart Scale Toggle (Dynamic vs Fixed 0-100%)
+  function updateScaleToggleButton() {
+    if (!el.btnChartScaleToggle) return;
+    const isDyn = (state.chartScaleMode === 'dynamic');
+    if (el.chartScaleLabel) {
+      el.chartScaleLabel.textContent = isDyn ? 'Dynamic Scale' : '0-100% Scale';
+    }
+    if (el.chartScaleIcon) {
+      el.chartScaleIcon.className = isDyn ? 'bi bi-arrows-expand text-info' : 'bi bi-arrows-collapse text-muted';
+    }
+    el.btnChartScaleToggle.classList.toggle('active-dynamic', isDyn);
+  }
+
+  if (el.btnChartScaleToggle) {
+    updateScaleToggleButton();
+    el.btnChartScaleToggle.addEventListener('click', () => {
+      state.chartScaleMode = (state.chartScaleMode === 'dynamic') ? 'fixed' : 'dynamic';
+      localStorage.setItem('dash_chart_scale', state.chartScaleMode);
+      updateScaleToggleButton();
+      updateHistoricalCharts();
     });
   }
 
-  // Alert Filter Buttons
+  // Quick Collect Sample Button in Historical Header
+  if (el.btnChartCollectSample) {
+    el.btnChartCollectSample.addEventListener('click', async () => {
+      if (!state.selectedServerId) {
+        showToast('Please select a server first.', 'warning');
+        return;
+      }
+      const origHtml = el.btnChartCollectSample.innerHTML;
+      el.btnChartCollectSample.disabled = true;
+      el.btnChartCollectSample.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Sampling...';
+
+      try {
+        const res = await collectServerMetricsNow(state.selectedServerId);
+        if (res.success) {
+          showToast('Sample collected! Telemetry updated.', 'success');
+          await updateHistoricalCharts();
+          await refreshAll(true);
+        } else {
+          showToast(`Sampling failed: ${res.message}`, 'danger');
+        }
+      } catch (err) {
+        showToast(`Sampling error: ${err.message}`, 'danger');
+      } finally {
+        el.btnChartCollectSample.disabled = false;
+        el.btnChartCollectSample.innerHTML = origHtml;
+      }
+    });
+  }
+
+  // Alert Filters
   document.querySelectorAll('[data-alert-filter]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('[data-alert-filter]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       state.currentAlertFilter = btn.getAttribute('data-alert-filter');
-      renderAlertsList();
+      renderAlertCenter();
     });
   });
 
@@ -1420,7 +1899,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (res.success) {
           showToast('Fresh metrics collected successfully!', 'success');
           await refreshAll(true);
-          // Re-populate modal with updated data
           openServerDetailModal(state.selectedServerId);
         } else {
           showToast(`Collection failed: ${res.message}`, 'danger');
@@ -1441,7 +1919,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Initialize
+  // Clean up on page unload
+  window.addEventListener('beforeunload', () => {
+    stopCountdown();
+  });
+
+  // Initialize Dashboard Application
   applyTheme(state.theme);
   refreshAll(false);
   startCountdown();

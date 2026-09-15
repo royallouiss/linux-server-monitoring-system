@@ -188,6 +188,7 @@ class ServerSerializer(serializers.ModelSerializer):
     )
     active_alerts_count = serializers.SerializerMethodField()
     latest_metrics = serializers.SerializerMethodField()
+    health_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Server
@@ -202,6 +203,7 @@ class ServerSerializer(serializers.ModelSerializer):
             "operating_system_display",
             "status",
             "status_display",
+            "health_status",
             "last_check_at",
             "last_success_at",
             "last_error",
@@ -225,21 +227,58 @@ class ServerSerializer(serializers.ModelSerializer):
     def get_latest_metrics(self, obj: Server):
         return get_server_latest_metrics(obj)
 
+    def get_health_status(self, obj: Server) -> str:
+        if obj.status == "DOWN":
+            return "OFFLINE"
+        if obj.status == "UNKNOWN":
+            return "UNKNOWN"
+        active_alerts = obj.alerts.filter(status=Alert.Status.ACTIVE)
+        if active_alerts.filter(severity=Alert.Severity.CRITICAL).exists():
+            return "CRITICAL"
+        if active_alerts.filter(severity=Alert.Severity.WARNING).exists():
+            return "WARNING"
+        metrics = get_server_latest_metrics(obj)
+        if metrics:
+            cpu_pct = metrics.get("cpu", {}).get("usage_percent", 0.0)
+            mem_pct = metrics.get("memory", {}).get("usage_percent", 0.0)
+            disk_pct = metrics.get("disk", {}).get("usage_percent", 0.0)
+            if cpu_pct >= 90 or mem_pct >= 90 or disk_pct >= 90:
+                return "CRITICAL"
+            if cpu_pct >= 80 or mem_pct >= 80 or disk_pct >= 80:
+                return "WARNING"
+        return "HEALTHY"
+
 
 class DashboardStatsSerializer(serializers.Serializer):
     total_servers = serializers.IntegerField()
     online_servers = serializers.IntegerField()
+    warning_servers = serializers.IntegerField(default=0)
     offline_servers = serializers.IntegerField()
     unknown_servers = serializers.IntegerField()
     active_alerts = serializers.IntegerField()
     critical_alerts = serializers.IntegerField()
     warning_alerts = serializers.IntegerField()
     healthy_percent = serializers.FloatField()
+    monitoring_success_rate = serializers.FloatField(default=100.0)
+    system_status = serializers.CharField(default="HEALTHY")
     avg_cpu = serializers.FloatField()
     avg_cpu_delta = serializers.FloatField(default=0.0)
     avg_memory = serializers.FloatField()
     avg_memory_delta = serializers.FloatField(default=0.0)
     avg_disk = serializers.FloatField()
+    monitoring_engine = serializers.DictField(
+        required=False,
+        default=dict,
+    )
+    tasks = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        default=list,
+    )
+    resource_sparklines = serializers.DictField(
+        required=False,
+        default=dict,
+    )
     recent_activity = serializers.ListField(
         child=serializers.DictField(),
         required=False,

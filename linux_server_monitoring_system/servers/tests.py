@@ -104,10 +104,61 @@ class DashboardApiTests(TestCase):
         data = response.json()
         self.assertIn("total_servers", data)
         self.assertIn("online_servers", data)
+        self.assertIn("warning_servers", data)
         self.assertIn("offline_servers", data)
         self.assertIn("active_alerts", data)
+        self.assertIn("monitoring_success_rate", data)
+        self.assertIn("system_status", data)
+        self.assertIn("monitoring_engine", data)
+        self.assertIn("tasks", data)
+        self.assertIn("resource_sparklines", data)
         self.assertEqual(data["total_servers"], 1)
         self.assertEqual(data["online_servers"], 1)
+        self.assertEqual(data["system_status"], "HEALTHY")
+        self.assertIn("service_status", data["monitoring_engine"])
+        self.assertIn("scheduler_status", data["monitoring_engine"])
+        self.assertIn("runner_status", data["monitoring_engine"])
+
+    def test_system_status_transitions(self):
+        from linux_server_monitoring_system.servers.models import Alert
+
+        # Initially 1 server UP -> HEALTHY
+        resp = self.client.get("/api/dashboard/stats/")
+        self.assertEqual(resp.json()["system_status"], "HEALTHY")
+
+        # Add WARNING alert -> WARNING
+        warn_alert = Alert.objects.create(
+            server=self.server,
+            title="High Disk Usage",
+            severity=Alert.Severity.WARNING,
+            status=Alert.Status.ACTIVE,
+        )
+        resp = self.client.get("/api/dashboard/stats/")
+        self.assertEqual(resp.json()["system_status"], "WARNING")
+        self.assertEqual(resp.json()["warning_servers"], 1)
+
+        # Make server DOWN -> CRITICAL
+        self.server.status = "DOWN"
+        self.server.save()
+        resp = self.client.get("/api/dashboard/stats/")
+        self.assertEqual(resp.json()["system_status"], "CRITICAL")
+        self.assertEqual(resp.json()["offline_servers"], 1)
+
+    def test_server_serializer_health_status(self):
+        from linux_server_monitoring_system.servers.api.serializers import ServerSerializer
+
+        # UP -> HEALTHY
+        self.assertEqual(ServerSerializer(self.server).data["health_status"], "HEALTHY")
+
+        # DOWN -> OFFLINE
+        self.server.status = "DOWN"
+        self.server.save()
+        self.assertEqual(ServerSerializer(self.server).data["health_status"], "OFFLINE")
+
+        # UNKNOWN -> UNKNOWN
+        self.server.status = "UNKNOWN"
+        self.server.save()
+        self.assertEqual(ServerSerializer(self.server).data["health_status"], "UNKNOWN")
 
     def test_server_list_security_no_password_exposed(self):
         response = self.client.get("/api/servers/")
@@ -116,6 +167,7 @@ class DashboardApiTests(TestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["server_name"], "Prod Web 01")
         self.assertNotIn("password", data[0])
+        self.assertIn("health_status", data[0])
 
     def test_server_metrics_endpoint(self):
         from django.utils import timezone
@@ -139,6 +191,10 @@ class DashboardApiTests(TestCase):
         self.assertIn("network_rx", data)
         self.assertEqual(len(data["cpu"]), 1)
         self.assertEqual(data["cpu"][0], 45.5)
+        self.assertIn("summary", data)
+        self.assertEqual(data["summary"]["cpu"]["current"], 45.5)
+        self.assertEqual(data["summary"]["cpu"]["peak"], 45.5)
+        self.assertEqual(data["interval_seconds"], 10)
 
     @patch("linux_server_monitoring_system.servers.api.views.SSHService")
     def test_server_test_connection_action(self, mock_ssh_cls):
@@ -202,6 +258,16 @@ class DashboardApiTests(TestCase):
         auth_client.force_login(self.admin_user)
         response = auth_client.get("/")
         self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("dashboard-app", content)
+        self.assertIn("system-command-bar", content)
+        self.assertIn("servers-table-body", content)
+        self.assertIn("section-heatmap", content)
+        self.assertIn("section-alerts-tasks", content)
+        self.assertIn("section-engine", content)
+        self.assertIn("refresh-countdown-badge", content)
+        self.assertIn("dashboard.js", content)
+        self.assertIn("dashboard.css", content)
 
 
 class AdminUiUxTests(TestCase):

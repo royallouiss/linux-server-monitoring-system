@@ -492,6 +492,22 @@ body.dashboard-body {
   width: 100%;
 }
 
+#chart-model-group .btn.active {
+  background-color: var(--dash-primary);
+  border-color: var(--dash-primary);
+  color: #ffffff;
+}
+
+#btn-chart-scale-toggle.active-dynamic {
+  border-color: var(--dash-info);
+  color: var(--dash-info);
+  background-color: rgba(14, 165, 233, 0.12);
+}
+
+#btn-chart-scale-toggle:hover {
+  background-color: rgba(14, 165, 233, 0.2);
+}
+
 /* Alerts Section */
 .alert-item-card {
   border: 1px solid var(--dash-border);
@@ -674,7 +690,428 @@ body.dashboard-body {
   100% { background-color: transparent !important; }
 }
 
-/* Responsive Breakpoints */
+/* ==========================================================================
+   COMMAND CENTER & SYSTEM HEALTH BAR (PHASE 3)
+   ========================================================================== */
+.system-command-bar {
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--dash-card-shadow);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.system-title-group h1 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.15rem;
+  text-transform: uppercase;
+}
+
+.system-subtitle {
+  font-size: 0.75rem;
+  color: var(--dash-text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.system-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.system-status-pill.healthy {
+  background-color: var(--dash-success-subtle);
+  color: var(--dash-success);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.system-status-pill.warning {
+  background-color: var(--dash-warning-subtle);
+  color: var(--dash-warning);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.system-status-pill.critical {
+  background-color: var(--dash-danger-subtle);
+  color: var(--dash-danger);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.system-counters {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+
+.counter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--dash-text-secondary);
+}
+
+.counter-chip strong {
+  color: var(--dash-text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.system-refresh-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: var(--dash-surface-subtle);
+  border: 1px solid var(--dash-border);
+  border-radius: 8px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  color: var(--dash-text-secondary);
+}
+
+.system-refresh-pill strong {
+  color: var(--dash-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ==========================================================================
+   KPI GRID (PHASE 4)
+   ========================================================================== */
+.kpi-icon-warning {
+  background: var(--dash-warning-subtle);
+  color: var(--dash-warning);
+}
+
+.kpi-icon-rate {
+  background: var(--dash-info-subtle);
+  color: var(--dash-info);
+}
+
+/* ==========================================================================
+   SERVER HEALTH MATRIX (PHASE 5, 6, 7, 8)
+   ========================================================================== */
+.matrix-card {
+  margin-bottom: 1.5rem;
+}
+
+.matrix-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.matrix-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.matrix-subtext {
+  font-size: 0.78rem;
+  color: var(--dash-text-muted);
+}
+
+.matrix-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.matrix-search {
+  position: relative;
+  min-width: 200px;
+}
+
+.matrix-search i {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--dash-text-muted);
+  font-size: 0.85rem;
+}
+
+.matrix-search-input {
+  width: 100%;
+  padding: 0.35rem 0.75rem 0.35rem 2.2rem;
+  background-color: var(--dash-bg);
+  border: 1px solid var(--dash-border);
+  border-radius: 6px;
+  color: var(--dash-text-primary);
+  font-size: 0.82rem;
+}
+
+.matrix-search-input:focus {
+  outline: none;
+  border-color: var(--dash-border-focus);
+}
+
+/* Attention-first row highlighting */
+.matrix-row-attention-critical {
+  background-color: rgba(239, 68, 68, 0.08) !important;
+  border-left: 3px solid var(--dash-danger) !important;
+}
+
+.matrix-row-attention-warning {
+  background-color: rgba(245, 158, 11, 0.06) !important;
+  border-left: 3px solid var(--dash-warning) !important;
+}
+
+/* Compact Progress Indicators */
+.metric-meter-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 105px;
+}
+
+.metric-meter-compact .meter-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+}
+
+.metric-meter-compact .meter-pct {
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.meter-track-sm {
+  height: 5px;
+  background-color: var(--dash-surface-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.meter-fill-sm {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* ==========================================================================
+   RESOURCE OVERVIEW & SPARKLINE PANELS (PHASE 9)
+   ========================================================================== */
+.resource-overview-panel {
+  background-color: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--dash-card-shadow);
+}
+
+.resource-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.resource-panel-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dash-text-muted);
+}
+
+.resource-panel-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  margin: 0.25rem 0;
+}
+
+.sparkline-box {
+  height: 48px;
+  width: 100%;
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+/* ==========================================================================
+   RESOURCE HEALTH MATRIX / HEATMAP (PHASE 10)
+   ========================================================================== */
+.heatmap-card {
+  margin-bottom: 1.5rem;
+}
+
+.badge-heatmap-good {
+  background-color: var(--dash-success-subtle);
+  color: var(--dash-success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+}
+
+.badge-heatmap-warn {
+  background-color: var(--dash-warning-subtle);
+  color: var(--dash-warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+}
+
+.badge-heatmap-high {
+  background-color: var(--dash-danger-subtle);
+  color: var(--dash-danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+}
+
+.badge-heatmap-offline {
+  background-color: var(--dash-surface-hover);
+  color: var(--dash-text-muted);
+  border: 1px solid var(--dash-border);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   ACTION CENTER / OPERATIONAL TASKS (PHASE 12)
+   ========================================================================== */
+.action-center-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.task-item-card {
+  background-color: var(--dash-surface-subtle);
+  border: 1px solid var(--dash-border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  transition: all 0.15s ease;
+}
+
+.task-item-card:hover {
+  background-color: var(--dash-surface-hover);
+  border-color: var(--dash-border-subtle);
+}
+
+.task-item-card.priority-urgent {
+  border-left: 4px solid var(--dash-danger);
+}
+
+.task-item-card.priority-high {
+  border-left: 4px solid var(--dash-warning);
+}
+
+.task-item-card.priority-medium {
+  border-left: 4px solid var(--dash-info);
+}
+
+.task-item-card.priority-info {
+  border-left: 4px solid var(--dash-success);
+}
+
+/* ==========================================================================
+   MONITORING ENGINE STATUS (PHASE 15)
+   ========================================================================== */
+.engine-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.engine-item {
+  background-color: var(--dash-surface-subtle);
+  border: 1px solid var(--dash-border);
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+}
+
+.engine-label {
+  font-size: 0.72rem;
+  color: var(--dash-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+.engine-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ==========================================================================
+   HISTORICAL SUMMARY BADGES (PHASE 14)
+   ========================================================================== */
+.stat-metric-badge {
+  font-size: 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background-color: var(--dash-surface-hover);
+  color: var(--dash-text-secondary);
+}
+
+.stat-metric-badge strong {
+  color: var(--dash-text-primary);
+}
+
+/* ==========================================================================
+   SYSTEM FOOTER
+   ========================================================================== */
+.dash-footer {
+  margin-top: 2rem;
+  padding: 1.25rem 0;
+  border-top: 1px solid var(--dash-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: var(--dash-text-muted);
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS (PHASE 23)
+   ========================================================================== */
 @media (max-width: 992px) {
   .dash-sidebar {
     transform: translateX(-100%);
@@ -684,5 +1121,22 @@ body.dashboard-body {
   }
   .dash-main {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .system-command-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .matrix-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .matrix-controls {
+    width: 100%;
+  }
+  .matrix-search {
+    width: 100%;
   }
 }

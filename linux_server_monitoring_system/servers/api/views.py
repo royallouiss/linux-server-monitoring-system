@@ -137,6 +137,222 @@ def _build_recent_activity():
     return _annotate_activity_deltas(recent_activity)
 
 
+def _get_server_warning_status(server):
+    if server.status == "DOWN":
+        return False
+    if server.alerts.filter(
+        status=Alert.Status.ACTIVE,
+        severity__in=[Alert.Severity.WARNING, Alert.Severity.CRITICAL],
+    ).exists():
+        return True
+    m = get_server_latest_metrics(server)
+    if m:
+        c = m.get("cpu", {}).get("usage_percent", 0.0)
+        mem = m.get("memory", {}).get("usage_percent", 0.0)
+        d = m.get("disk", {}).get("usage_percent", 0.0)
+        if c >= 80 or mem >= 80 or d >= 80:
+            return True
+    return False
+
+
+def _build_monitoring_engine_status(all_servers):
+    total_metrics_count = MetricSample.objects.count()
+    last_success = None
+    last_fail = None
+    last_check = None
+
+    for s in all_servers:
+        if s.last_check_at and (last_check is None or s.last_check_at > last_check):
+            last_check = s.last_check_at
+        if s.last_success_at and (last_success is None or s.last_success_at > last_success):
+            last_success = s.last_success_at
+        if s.last_error and s.last_check_at and (last_fail is None or s.last_check_at > last_fail):
+            last_fail = s.last_check_at
+
+    has_active_servers = any(s.is_active for s in all_servers)
+    has_recent_failures = any(s.status == "DOWN" or bool(s.last_error) for s in all_servers)
+
+    return {
+        "service_status": "Running" if has_active_servers else "Standby",
+        "scheduler_status": "Active" if has_active_servers else "Idle",
+        "runner_status": "Degraded" if has_recent_failures else "Healthy",
+        "last_successful_run": last_success.isoformat() if last_success else None,
+        "last_failed_run": last_fail.isoformat() if last_fail else None,
+        "last_check": last_check.isoformat() if last_check else None,
+        "total_metrics_count": total_metrics_count,
+    }
+
+
+def _build_operational_tasks(all_servers):
+    tasks = []
+    # 1. Offline servers (URGENT)
+    for s in all_servers:
+        if s.status == "DOWN":
+            err_snip = f": {s.last_error[:50]}..." if s.last_error else ""
+            tasks.append({
+                "id": f"task-offline-{s.id}",
+                "priority": "URGENT",
+                "server_id": s.id,
+                "server_name": s.server_name,
+                "hostname": s.hostname,
+                "title": f"Server Offline - Connection unreachable{err_snip}",
+                "action_type": "test_ssh",
+                "action_label": "Test SSH",
+            })
+
+    # 2. Critical alerts (URGENT / HIGH)
+    crit_alerts = Alert.objects.filter(
+        status=Alert.Status.ACTIVE,
+        severity=Alert.Severity.CRITICAL,
+    ).select_related("server")
+    for a in crit_alerts:
+        tasks.append({
+            "id": f"task-alert-{a.id}",
+            "priority": "URGENT",
+            "server_id": a.server_id,
+            "server_name": a.server.server_name,
+            "hostname": a.server.hostname,
+            "title": f"Critical Incident: {a.title}",
+            "action_type": "view_details",
+            "action_label": "Investigate",
+        })
+
+    # 3. Warning alerts & High resource thresholds (HIGH)
+    warn_alerts = Alert.objects.filter(
+        status=Alert.Status.ACTIVE,
+        severity=Alert.Severity.WARNING,
+    ).select_related("server")
+    for a in warn_alerts:
+        tasks.append({
+            "id": f"task-alert-{a.id}",
+            "priority": "HIGH",
+            "server_id": a.server_id,
+            "server_name": a.server.server_name,
+            "hostname": a.server.hostname,
+            "title": f"Warning Alert: {a.title}",
+            "action_type": "view_details",
+            "action_label": "Review Alert",
+        })
+
+    for s in all_servers:
+        if s.status == "UP":
+            m = get_server_latest_metrics(s)
+            if m:
+                cpu_v = m.get("cpu", {}).get("usage_percent", 0.0)
+                mem_v = m.get("memory", {}).get("usage_percent", 0.0)
+                disk_v = m.get("disk", {}).get("usage_percent", 0.0)
+                if disk_v >= 85:
+                    tasks.append({
+                        "id": f"task-disk-{s.id}",
+                        "priority": "HIGH",
+                        "server_id": s.id,
+                        "server_name": s.server_name,
+                        "hostname": s.hostname,
+                        "title": f"High Disk Utilization ({disk_v}%) on {m.get('disk', {}).get('mount_point', '/')}",
+                        "action_type": "view_details",
+                        "action_label": "Inspect Disk",
+                    })
+                elif cpu_v >= 85:
+                    tasks.append({
+                        "id": f"task-cpu-{s.id}",
+                        "priority": "HIGH",
+                        "server_id": s.id,
+                        "server_name": s.server_name,
+                        "hostname": s.hostname,
+                        "title": f"Elevated CPU Utilization ({cpu_v}%)",
+                        "action_type": "view_details",
+                        "action_label": "Inspect CPU",
+                    })
+                elif mem_v >= 85:
+                    tasks.append({
+                        "id": f"task-mem-{s.id}",
+                        "priority": "HIGH",
+                        "server_id": s.id,
+                        "server_name": s.server_name,
+                        "hostname": s.hostname,
+                        "title": f"Elevated Memory Usage ({mem_v}%)",
+                        "action_type": "view_details",
+                        "action_label": "Inspect RAM",
+                    })
+
+    # 4. Monitoring errors / unknown status (MEDIUM)
+    for s in all_servers:
+        if s.status == "UNKNOWN":
+            tasks.append({
+                "id": f"task-unknown-{s.id}",
+                "priority": "MEDIUM",
+                "server_id": s.id,
+                "server_name": s.server_name,
+                "hostname": s.hostname,
+                "title": f"No telemetry recorded yet - initial check pending",
+                "action_type": "collect_metrics",
+                "action_label": "Collect Now",
+            })
+        elif s.last_error and s.status != "DOWN":
+            tasks.append({
+                "id": f"task-err-{s.id}",
+                "priority": "MEDIUM",
+                "server_id": s.id,
+                "server_name": s.server_name,
+                "hostname": s.hostname,
+                "title": f"Recent check warning: {s.last_error[:50]}",
+                "action_type": "collect_metrics",
+                "action_label": "Retry Run",
+            })
+
+    # 5. Fallback INFO task if everything is green
+    if not tasks:
+        tasks.append({
+            "id": "task-info-fleet-healthy",
+            "priority": "INFO",
+            "server_id": all_servers[0].id if all_servers else None,
+            "server_name": "Fleet",
+            "hostname": "All servers",
+            "title": "All systems operating normally — no pending operational issues",
+            "action_type": "none",
+            "action_label": "Fleet Healthy",
+        })
+
+    return tasks[:8]
+
+
+def _build_resource_sparklines():
+    recent_ts = list(
+        MetricSample.objects.values_list("timestamp", flat=True)
+        .distinct()
+        .order_by("-timestamp")[:10]
+    )
+    recent_ts.reverse()
+
+    cpu_pts = []
+    mem_pts = []
+    disk_pts = []
+    net_pts = []
+
+    for ts in recent_ts:
+        samples = MetricSample.objects.filter(timestamp=ts)
+        cpu_vals = [float(s.value) for s in samples if s.metric_name == "cpu_usage"]
+        mem_vals = [float(s.value) for s in samples if s.metric_name == "memory_usage"]
+        disk_vals = [float(s.value) for s in samples if s.metric_name.startswith("disk_usage:")]
+        rx_vals = [float(s.value) / 1024 for s in samples if s.metric_name.startswith("network_receive_rate:")]
+
+        if cpu_vals:
+            cpu_pts.append(round(sum(cpu_vals) / len(cpu_vals), 1))
+        if mem_vals:
+            mem_pts.append(round(sum(mem_vals) / len(mem_vals), 1))
+        if disk_vals:
+            disk_pts.append(round(sum(disk_vals) / len(disk_vals), 1))
+        if rx_vals:
+            net_pts.append(round(sum(rx_vals) / len(rx_vals), 1))
+
+    return {
+        "cpu": cpu_pts,
+        "memory": mem_pts,
+        "disk": disk_pts,
+        "network": net_pts,
+    }
+
+
 class DashboardStatsView(APIView):
     """Provides high-level aggregated metrics for the monitoring dashboard."""
 
@@ -144,10 +360,12 @@ class DashboardStatsView(APIView):
 
     @extend_schema(responses={200: DashboardStatsSerializer})
     def get(self, request, *args, **kwargs):
-        total_servers = Server.objects.count()
-        online_servers = Server.objects.filter(status="UP").count()
-        offline_servers = Server.objects.filter(status="DOWN").count()
-        unknown_servers = Server.objects.filter(status="UNKNOWN").count()
+        all_servers = list(Server.objects.all().prefetch_related("alerts", "metric_samples"))
+        total_servers = len(all_servers)
+        online_servers = sum(1 for s in all_servers if s.status == "UP")
+        offline_servers = sum(1 for s in all_servers if s.status == "DOWN")
+        unknown_servers = sum(1 for s in all_servers if s.status == "UNKNOWN")
+        warning_servers = sum(1 for s in all_servers if _get_server_warning_status(s))
 
         active_alerts = Alert.objects.filter(status=Alert.Status.ACTIVE).count()
         critical_alerts = Alert.objects.filter(
@@ -165,23 +383,47 @@ class DashboardStatsView(APIView):
             else 0.0
         )
 
-        fleet_averages = _calculate_fleet_averages(Server.objects.all())
+        active_servers_count = sum(1 for s in all_servers if s.is_active)
+        if active_servers_count > 0:
+            monitoring_success_rate = round((online_servers / active_servers_count) * 100, 1)
+        elif total_servers > 0:
+            monitoring_success_rate = round((online_servers / total_servers) * 100, 1)
+        else:
+            monitoring_success_rate = 100.0
+
+        if offline_servers > 0 or critical_alerts > 0:
+            system_status = "CRITICAL"
+        elif warning_servers > 0 or warning_alerts > 0:
+            system_status = "WARNING"
+        else:
+            system_status = "HEALTHY"
+
+        fleet_averages = _calculate_fleet_averages(all_servers)
         recent_activity = _build_recent_activity()
+        monitoring_engine = _build_monitoring_engine_status(all_servers)
+        tasks = _build_operational_tasks(all_servers)
+        resource_sparklines = _build_resource_sparklines()
 
         data = {
             "total_servers": total_servers,
             "online_servers": online_servers,
+            "warning_servers": warning_servers,
             "offline_servers": offline_servers,
             "unknown_servers": unknown_servers,
             "active_alerts": active_alerts,
             "critical_alerts": critical_alerts,
             "warning_alerts": warning_alerts,
             "healthy_percent": healthy_percent,
+            "monitoring_success_rate": monitoring_success_rate,
+            "system_status": system_status,
             "avg_cpu": fleet_averages["avg_cpu"],
             "avg_cpu_delta": fleet_averages["avg_cpu_delta"],
             "avg_memory": fleet_averages["avg_memory"],
             "avg_memory_delta": fleet_averages["avg_memory_delta"],
             "avg_disk": fleet_averages["avg_disk"],
+            "monitoring_engine": monitoring_engine,
+            "tasks": tasks,
+            "resource_sparklines": resource_sparklines,
             "recent_activity": recent_activity,
             "last_updated": timezone.now(),
         }
@@ -405,6 +647,15 @@ class ServerViewSet(ModelViewSet):
             else 0.0
         )
 
+        def _calc_stats(series):
+            if not series:
+                return {"current": 0.0, "avg": 0.0, "peak": 0.0}
+            return {
+                "current": round(series[-1], 2),
+                "avg": round(sum(series) / len(series), 2),
+                "peak": round(max(series), 2),
+            }
+
         return Response(
             {
                 "range": range_param,
@@ -424,7 +675,14 @@ class ServerViewSet(ModelViewSet):
                     "network_rx": latest_rx_delta,
                     "network_tx": latest_tx_delta,
                 },
-                "interval_seconds": 30,
+                "summary": {
+                    "cpu": _calc_stats(cpu_series),
+                    "memory": _calc_stats(mem_series),
+                    "disk": _calc_stats(disk_series),
+                    "network_rx": _calc_stats(net_rx_series),
+                    "network_tx": _calc_stats(net_tx_series),
+                },
+                "interval_seconds": 10,
             },
             status=status.HTTP_200_OK,
         )
