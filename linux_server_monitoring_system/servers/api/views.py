@@ -11,6 +11,9 @@ from rest_framework.viewsets import ModelViewSet
 
 from linux_server_monitoring_system.core.ssh import SSHService
 from linux_server_monitoring_system.monitoring.jobs.monitoring import MonitoringJob
+from linux_server_monitoring_system.monitoring.api.serializers import (
+    MetricSampleSerializer,
+)
 from linux_server_monitoring_system.monitoring.models import MetricSample
 from linux_server_monitoring_system.servers.models import Alert
 from linux_server_monitoring_system.servers.models import Server
@@ -327,8 +330,25 @@ class ServerViewSet(ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def metrics(self, request, pk=None):
-        """Returns time-series metric data for Chart.js visualization."""
+        """Returns time-series metric data for Chart.js visualization.
+
+        Without a ``range`` query param, returns the raw serialized
+        ``MetricSample`` list (monitoring API contract); with ``range``,
+        returns the aggregated Chart.js series dict.
+        """
         server = self.get_object()
+        if "range" not in request.query_params:
+            samples = MetricSample.objects.filter(server=server).order_by(
+                "-timestamp",
+            )
+            return Response(
+                MetricSampleSerializer(
+                    samples,
+                    many=True,
+                    context={"request": request},
+                ).data,
+                status=status.HTTP_200_OK,
+            )
         range_param = request.query_params.get("range", "24h").lower()
 
         now = timezone.now()
@@ -450,8 +470,6 @@ class ServerViewSet(ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-<<<<<<< Updated upstream
-=======
     @action(detail=False, methods=["get"], url_path="fleet-metrics")
     def fleet_metrics(self, request):
         """Return time-series averages across all registered servers."""
@@ -565,8 +583,6 @@ class ServerViewSet(ModelViewSet):
             ).data,
             status=status.HTTP_200_OK,
         )
-
->>>>>>> Stashed changes
 
 
 class AlertViewSet(ModelViewSet):
