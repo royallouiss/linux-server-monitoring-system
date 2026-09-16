@@ -1,6 +1,7 @@
 from allauth.account.forms import SignupForm
 from allauth.socialaccount.forms import SignupForm as SocialSignupForm
 from django.contrib.auth import forms as admin_forms
+from django.core.exceptions import ValidationError
 from django.forms import EmailField
 from django.utils.translation import gettext_lazy as _
 
@@ -34,6 +35,17 @@ class UserSignupForm(SignupForm):
     Default fields will be added automatically.
     Check UserSocialSignupForm for accounts created from social.
     """
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        if "@" not in email:
+            raise ValidationError("Enter a valid email address.")
+        return email
+
+    def clean_password1(self):
+        password = self.cleaned_data["password1"]
+        if len(password) < 8:
+            raise ValidationError("Password must be at least 8 characters long.")
+        return password
 
 
 class UserSocialSignupForm(SocialSignupForm):

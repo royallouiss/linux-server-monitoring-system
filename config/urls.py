@@ -12,7 +12,7 @@ from rest_framework.authtoken.views import obtain_auth_token
 
 admin.site.site_header = "Linux Server Monitoring System"
 admin.site.site_title = "Monitoring System Admin"
-admin.site.index_title = "Fleet Administration & Telemetry Management"
+admin.site.index_title = "Administration & Telemetry Management"
 
 urlpatterns = [
     path(

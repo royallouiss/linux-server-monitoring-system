@@ -1,0 +1,35 @@
+{% extends "account/base_entrance.html" %}
+{% load allauth i18n %}
+
+{% block head_title %}
+  {% trans "Sign In" %}
+{% endblock head_title %}
+
+{% block content %}
+  <div class="auth-panel">
+    <div class="text-center mb-4">
+      <div class="auth-brand-icon mb-3"><i class="bi bi-shield-lock"></i></div>
+      <h1 class="h3 fw-bold mb-2">Welcome back</h1>
+      <p class="text-muted mb-0">Sign in to access your monitoring dashboard.</p>
+    </div>
+
+    {% url 'account_login' as login_url %}
+    {% element form form=form method="post" action=login_url tags="entrance,login" %}
+      {% slot body %}
+        {% csrf_token %}
+        {% element fields form=form unlabeled=True %}
+        {% endelement %}
+        {{ redirect_field }}
+        <div class="text-end mt-2">
+          <a href="{% url 'account_reset_password' %}" class="small">Forgot password?</a>
+        </div>
+      {% endslot %}
+      {% slot actions %}
+        {% element button type="submit" tags="prominent,login" %}
+          {% trans "Sign In" %}
+        {% endelement %}
+      {% endslot %}
+    {% endelement %}
+
+  </div>
+{% endblock content %}

@@ -12,6 +12,7 @@ from rest_framework.viewsets import ModelViewSet
 from linux_server_monitoring_system.core.ssh import SSHService
 from linux_server_monitoring_system.monitoring.jobs.monitoring import MonitoringJob
 from linux_server_monitoring_system.monitoring.models import MetricSample
+from linux_server_monitoring_system.monitoring.api.serializers import MetricSampleSerializer
 from linux_server_monitoring_system.servers.models import Alert
 from linux_server_monitoring_system.servers.models import Server
 
@@ -450,8 +451,6 @@ class ServerViewSet(ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-<<<<<<< Updated upstream
-=======
     @action(detail=False, methods=["get"], url_path="fleet-metrics")
     def fleet_metrics(self, request):
         """Return time-series averages across all registered servers."""
@@ -565,9 +564,6 @@ class ServerViewSet(ModelViewSet):
             ).data,
             status=status.HTTP_200_OK,
         )
-
->>>>>>> Stashed changes
-
 
 class AlertViewSet(ModelViewSet):
     """ViewSet for listing, filtering, and resolving alerts."""

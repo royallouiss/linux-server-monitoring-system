@@ -64,6 +64,44 @@ body.dashboard-body {
   min-height: 100vh;
 }
 
+.standalone-auth-page {
+  align-items: center;
+  background: var(--dash-bg);
+  color: var(--dash-text-primary);
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem 1rem;
+}
+
+.standalone-auth-card {
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  box-shadow: var(--dash-card-shadow);
+  max-width: 420px;
+  padding: 2.5rem;
+  text-align: center;
+  width: 100%;
+}
+
+.standalone-auth-card form {
+  margin: 0;
+}
+
+.standalone-auth-card button {
+  background: var(--dash-primary);
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 600;
+  padding: 0.65rem 1.25rem;
+}
+
+.standalone-auth-card button:hover {
+  background: var(--dash-primary-hover);
+}
+
 /* Layout Architecture */
 .dash-wrapper {
   display: flex;
@@ -551,6 +589,7 @@ body.dashboard-body {
   height: 330px;
   display: flex;
   flex-direction: column;
+  cursor: pointer;
 }
 
 .chart-canvas-container {
@@ -558,6 +597,12 @@ body.dashboard-body {
   position: relative;
   min-height: 0;
   width: 100%;
+}
+
+.chart-detail-canvas-container {
+  height: min(55vh, 520px);
+  min-height: 280px;
+  position: relative;
 }
 
 /* Alerts Section */

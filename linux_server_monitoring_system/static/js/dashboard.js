@@ -4,6 +4,8 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (!document.getElementById('dashboard-app')) return;
+
   // Global Dashboard State
   const state = {
     servers: [],
@@ -22,6 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
     countdownTimer: null,
     isFetching: false,
     theme: localStorage.getItem('dash_theme') || 'dark',
+    chartData: null,
+    detailChart: null,
     charts: {
       cpu: null,
       memory: null,
@@ -117,6 +121,15 @@ document.addEventListener('DOMContentLoaded', () => {
     deltaMemBadge: document.getElementById('delta-mem-badge'),
     deltaDiskBadge: document.getElementById('delta-disk-badge'),
     deltaNetBadge: document.getElementById('delta-net-badge'),
+    chartDetailModal: document.getElementById('chartDetailModal'),
+    chartDetailTitle: document.getElementById('chart-detail-title'),
+    chartDetailScope: document.getElementById('chart-detail-scope'),
+    chartDetailLatest: document.getElementById('chart-detail-latest'),
+    chartDetailAverage: document.getElementById('chart-detail-average'),
+    chartDetailMin: document.getElementById('chart-detail-min'),
+    chartDetailMax: document.getElementById('chart-detail-max'),
+    chartDetailCanvas: document.getElementById('chart-detail-canvas'),
+    chartDetailSamples: document.getElementById('chart-detail-samples'),
   };
 
   // Helper: Get CSRF Token
@@ -662,6 +675,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderChartsData(data) {
     if (!window.Chart) return;
+    state.chartData = data;
     const theme = getChartThemeColors();
 
     const formattedLabels = (data.labels || []).map(l => {
@@ -723,7 +737,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
           ],
         },
-        options: createChartOptions(theme, '%', [0, 100]),
+        options: createChartOptions(theme, '%', [0, 100], 'cpu'),
       });
     }
 
@@ -749,7 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
           ],
         },
-        options: createChartOptions(theme, '%', [0, 100]),
+        options: createChartOptions(theme, '%', [0, 100], 'memory'),
       });
     }
 
@@ -775,7 +789,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
           ],
         },
-        options: createChartOptions(theme, '%', [0, 100]),
+        options: createChartOptions(theme, '%', [0, 100], 'disk'),
       });
     }
 
@@ -812,12 +826,77 @@ document.addEventListener('DOMContentLoaded', () => {
             },
           ],
         },
-        options: createChartOptions(theme, ' KB/s'),
+        options: createChartOptions(theme, ' KB/s', null, 'network'),
       });
     }
   }
 
-  function createChartOptions(theme, unit = '', suggestedRange = null) {
+  function openChartDetail(chartKey) {
+    if (!window.Chart || !state.chartData || !el.chartDetailCanvas) return;
+
+    const definitions = {
+      cpu: { title: 'CPU Utilization', unit: '%', color: '#6366f1', values: state.chartData.cpu || [] },
+      memory: { title: 'Memory Usage', unit: '%', color: '#10b981', values: state.chartData.memory || [] },
+      disk: { title: 'Disk Usage', unit: '%', color: '#f59e0b', values: state.chartData.disk || [] },
+      network: { title: 'Network Traffic', unit: ' KB/s', color: '#0ea5e9', values: state.chartData.network_rx || [] },
+    };
+    const definition = definitions[chartKey];
+    if (!definition) return;
+
+    const values = definition.values.filter(value => typeof value === 'number' && Number.isFinite(value));
+    const formatValue = value => `${Number(value || 0).toFixed(2)}${definition.unit}`;
+    const averageValue = values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+    const latestValue = values.length ? values[values.length - 1] : 0;
+
+    if (el.chartDetailTitle) el.chartDetailTitle.textContent = definition.title;
+    if (el.chartDetailScope) {
+      el.chartDetailScope.textContent = `${state.selectedRange.toUpperCase()} · ${state.selectedServerIds.length ? 'Selected servers' : 'Fleet average'}`;
+    }
+    if (el.chartDetailLatest) el.chartDetailLatest.textContent = formatValue(latestValue);
+    if (el.chartDetailAverage) el.chartDetailAverage.textContent = formatValue(averageValue);
+    if (el.chartDetailMin) el.chartDetailMin.textContent = formatValue(values.length ? Math.min(...values) : 0);
+    if (el.chartDetailMax) el.chartDetailMax.textContent = formatValue(values.length ? Math.max(...values) : 0);
+    if (el.chartDetailSamples) el.chartDetailSamples.textContent = `${values.length} samples · Click a point to inspect its timestamp and value.`;
+
+    if (state.detailChart) state.detailChart.destroy();
+    const theme = getChartThemeColors();
+    const datasets = chartKey === 'network'
+      ? [
+        { label: 'Receive Rate (KB/s)', data: state.chartData.network_rx || [], borderColor: '#0ea5e9', backgroundColor: 'rgba(14, 165, 233, 0.12)' },
+        { label: 'Transmit Rate (KB/s)', data: state.chartData.network_tx || [], borderColor: '#a855f7', backgroundColor: 'rgba(168, 85, 247, 0.12)' },
+      ]
+      : [{ label: definition.title, data: definition.values, borderColor: definition.color, backgroundColor: `${definition.color}26` }];
+
+    state.detailChart = new Chart(el.chartDetailCanvas.getContext('2d'), {
+      type: 'line',
+      data: { labels: state.chartData.labels || [], datasets: datasets.map(dataset => ({
+        ...dataset,
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+      })) },
+      options: {
+        ...createChartOptions(theme, definition.unit, chartKey === 'network' ? null : [0, 100]),
+        plugins: {
+          ...createChartOptions(theme, definition.unit, chartKey === 'network' ? null : [0, 100]).plugins,
+          tooltip: {
+            ...createChartOptions(theme, definition.unit, chartKey === 'network' ? null : [0, 100]).plugins.tooltip,
+            callbacks: {
+              title: items => new Date(items[0].label).toLocaleString(),
+            },
+          },
+        },
+      },
+    });
+
+    if (window.bootstrap && el.chartDetailModal) {
+      bootstrap.Modal.getOrCreateInstance(el.chartDetailModal).show();
+    }
+  }
+
+  function createChartOptions(theme, unit = '', suggestedRange = null, chartKey = null) {
     const scales = {
       x: {
         grid: { color: theme.gridColor },
@@ -840,6 +919,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return {
       responsive: true,
       maintainAspectRatio: false,
+      onClick: () => {
+        if (chartKey) openChartDetail(chartKey);
+      },
       interaction: {
         mode: 'index',
         intersect: false,

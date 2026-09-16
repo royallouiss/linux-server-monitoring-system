@@ -3,9 +3,9 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from rest_framework.routers import SimpleRouter
 
-from linux_server_monitoring_system.monitoring.api.views import ServerViewSet
 from linux_server_monitoring_system.servers.api.views import AlertViewSet
 from linux_server_monitoring_system.servers.api.views import DashboardStatsView
+from linux_server_monitoring_system.servers.api.views import ServerViewSet
 from linux_server_monitoring_system.users.api.views import UserViewSet
 
 router = DefaultRouter() if settings.DEBUG else SimpleRouter()
