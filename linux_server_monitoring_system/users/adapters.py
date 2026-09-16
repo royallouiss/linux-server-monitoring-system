@@ -17,6 +17,29 @@ class AccountAdapter(DefaultAccountAdapter):
     def is_open_for_signup(self, request: HttpRequest) -> bool:
         return getattr(settings, "ACCOUNT_ALLOW_REGISTRATION", True)
 
+    def add_message(
+        self,
+        request: HttpRequest,
+        level: int,
+        message_template: str | None = None,
+        message_context: dict[str, typing.Any] | None = None,
+        extra_tags: str = "",
+        message: str | None = None,
+    ) -> None:
+        if message_template in {
+            "account/messages/logged_in.txt",
+            "account/messages/logged_out.txt",
+        }:
+            return
+        super().add_message(
+            request,
+            level,
+            message_template=message_template,
+            message_context=message_context,
+            extra_tags=extra_tags,
+            message=message,
+        )
+
 
 class SocialAccountAdapter(DefaultSocialAccountAdapter):
     def is_open_for_signup(

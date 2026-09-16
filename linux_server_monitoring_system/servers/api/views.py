@@ -15,6 +15,7 @@ from linux_server_monitoring_system.monitoring.api.serializers import (
     MetricSampleSerializer,
 )
 from linux_server_monitoring_system.monitoring.models import MetricSample
+from linux_server_monitoring_system.monitoring.api.serializers import MetricSampleSerializer
 from linux_server_monitoring_system.servers.models import Alert
 from linux_server_monitoring_system.servers.models import Server
 

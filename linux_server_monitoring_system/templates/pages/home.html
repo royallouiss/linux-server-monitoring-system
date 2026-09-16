@@ -417,6 +417,39 @@
         </div>
       </section>
 
+      <!-- ================= CHART DETAIL MODAL ================= -->
+      <div class="modal fade dash-modal" id="chartDetailModal" tabindex="-1" aria-labelledby="chartDetailModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <div>
+                <h5 class="modal-title fw-bold" id="chartDetailModalLabel">
+                  <i class="bi bi-graph-up text-info me-2"></i>
+                  <span id="chart-detail-title">Metric details</span>
+                </h5>
+                <div class="text-muted small" id="chart-detail-scope">Fleet average</div>
+              </div>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row g-3 mb-3">
+                <div class="col-6 col-md-3"><div class="p-3 border rounded"><div class="text-muted small">LATEST</div><div class="fw-bold fs-5" id="chart-detail-latest">--</div></div></div>
+                <div class="col-6 col-md-3"><div class="p-3 border rounded"><div class="text-muted small">AVERAGE</div><div class="fw-bold fs-5" id="chart-detail-average">--</div></div></div>
+                <div class="col-6 col-md-3"><div class="p-3 border rounded"><div class="text-muted small">MINIMUM</div><div class="fw-bold fs-5" id="chart-detail-min">--</div></div></div>
+                <div class="col-6 col-md-3"><div class="p-3 border rounded"><div class="text-muted small">MAXIMUM</div><div class="fw-bold fs-5" id="chart-detail-max">--</div></div></div>
+              </div>
+              <div class="chart-detail-canvas-container">
+                <canvas id="chart-detail-canvas"></canvas>
+              </div>
+              <div class="text-muted small mt-3" id="chart-detail-samples">No samples available.</div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ================= SECTION 5: LIVE 30S REFRESH & MONITORING STREAM ================= -->
       <section id="section-activity" class="dash-card">
         <div class="dash-card-header flex-wrap gap-2">
