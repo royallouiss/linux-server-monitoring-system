@@ -140,6 +140,9 @@ class Alert(models.Model):
         default=Status.ACTIVE,
         help_text="Current state of the alert.",
     )
+    is_read = models.BooleanField(
+        default=False,
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
     )
@@ -158,4 +161,4 @@ class Alert(models.Model):
     def resolve(self):
         self.status = self.Status.RESOLVED
         self.resolved_at = timezone.now()
-        self.save(update_fields=["status", "resolved_at"])
+        self.save(update_fields=["status", "resolved_at"])

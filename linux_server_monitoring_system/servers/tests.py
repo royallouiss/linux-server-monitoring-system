@@ -142,6 +142,8 @@ class DashboardApiTests(TestCase):
 
     @patch("linux_server_monitoring_system.servers.api.views.SSHService")
     def test_server_test_connection_action(self, mock_ssh_cls):
+        from linux_server_monitoring_system.servers.models import Alert
+
         mock_ssh = mock_ssh_cls.return_value
         mock_ssh.connect.return_value = (True, "Connection successful.")
         mock_ssh.execute_command.return_value = (True, "ubuntu-host")
@@ -154,6 +156,101 @@ class DashboardApiTests(TestCase):
         self.assertTrue(data["success"])
         self.assertEqual(data["status"], "UP")
         self.assertEqual(data["hostname"], "ubuntu-host")
+        self.assertTrue(
+            Alert.objects.filter(
+                server=self.server,
+                title="SSH Connection Successful",
+                severity=Alert.Severity.INFO,
+                status=Alert.Status.ACTIVE,
+            ).exists(),
+        )
+
+    @patch("linux_server_monitoring_system.servers.api.views.SSHService")
+    def test_failed_server_connection_creates_active_alert(self, mock_ssh_cls):
+        from linux_server_monitoring_system.servers.models import Alert
+
+        mock_ssh_cls.return_value.connect.return_value = (
+            False,
+            "Server is offline.",
+        )
+
+        response = self.client.post(
+            f"/api/servers/{self.server.id}/test_connection/",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["success"])
+        self.assertTrue(
+            Alert.objects.filter(
+                server=self.server,
+                status=Alert.Status.ACTIVE,
+                title="SSH Connection Failed",
+            ).exists(),
+        )
+
+    @patch("linux_server_monitoring_system.servers.api.views.SSHService")
+    def test_repeated_failed_connections_preserve_alert_history(self, mock_ssh_cls):
+        from linux_server_monitoring_system.servers.models import Alert
+
+        mock_ssh_cls.return_value.connect.return_value = (
+            False,
+            "Server is offline.",
+        )
+
+        for _ in range(2):
+            response = self.client.post(
+                f"/api/servers/{self.server.id}/test_connection/",
+            )
+            self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            Alert.objects.filter(
+                server=self.server,
+                title="SSH Connection Failed",
+            ).count(),
+            2,
+        )
+        response = self.client.get("/api/alerts/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 2)
+
+    @patch("linux_server_monitoring_system.servers.api.views.SSHService")
+    def test_connection_alerts_are_returned_newest_first(self, mock_ssh_cls):
+        from linux_server_monitoring_system.servers.models import Alert
+
+        Alert.objects.create(
+            server=self.server,
+            title="Older alert",
+            message="An older event.",
+            severity=Alert.Severity.WARNING,
+        )
+        mock_ssh = mock_ssh_cls.return_value
+        mock_ssh.connect.return_value = (True, "Connection successful.")
+        mock_ssh.execute_command.return_value = (True, "ubuntu-host")
+
+        self.client.post(f"/api/servers/{self.server.id}/test_connection/")
+        response = self.client.get("/api/alerts/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()[0]["title"], "SSH Connection Successful")
+
+    def test_alert_list_endpoint_returns_alerts(self):
+        from linux_server_monitoring_system.servers.models import Alert
+
+        Alert.objects.create(
+            server=self.server,
+            title="High CPU usage",
+            message="CPU usage exceeded the configured threshold.",
+            severity=Alert.Severity.WARNING,
+        )
+
+        response = self.client.get("/api/alerts/")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["title"], "High CPU usage")
+        self.assertFalse(data[0]["is_read"])
 
     def test_alert_list_and_resolve(self):
         from linux_server_monitoring_system.servers.models import Alert
@@ -258,4 +355,3 @@ class AdminUiUxTests(TestCase):
         response = self.client.get("/admin/monitoring/metricsample/")
         self.assertEqual(response.status_code, 200)
 
-

@@ -171,6 +171,7 @@ class AlertSerializer(serializers.ModelSerializer):
             "severity",
             "severity_display",
             "status",
+            "is_read",
             "status_display",
             "created_at",
             "resolved_at",

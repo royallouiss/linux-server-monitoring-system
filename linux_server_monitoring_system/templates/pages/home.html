@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% load static i18n %}
 
+{% block javascript %}
+  {{ block.super }}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+{% endblock javascript %}
 {% block title %}
   Fleet Dashboard - Linux Server Monitoring System
 {% endblock title %}
@@ -9,6 +13,7 @@
 
 {% block body %}
 <div class="dash-wrapper" id="dashboard-app" data-bs-theme="dark">
+  {% csrf_token %}
 
   <!-- ================= SIDEBAR ================= -->
   <aside class="dash-sidebar" id="dash-sidebar">
@@ -38,22 +43,23 @@
         <i class="bi bi-activity"></i>
         <span>Resource Metrics</span>
       </a>
-      <a href="#section-alerts" class="dash-nav-link">
+      <a href="{% url 'alerts' %}" class="dash-nav-link">
         <i class="bi bi-shield-exclamation"></i>
         <span>Alerts & Events</span>
+        <span class="alert-unread-dot d-none" id="alert-unread-dot" aria-label="Unread alerts"></span>
       </a>
 
       <div class="dash-nav-header mt-3">Administration</div>
       <a href="{% url 'admin:index' %}" class="dash-nav-link" target="_blank">
         <i class="bi bi-sliders"></i>
-        <span>Django Admin</span>
+        <span>Admin</span>
       </a>
     </nav>
 
     <div class="dash-sidebar-footer">
       <div class="fleet-health-pill">
         <div class="d-flex align-items-center justify-content-between mb-1">
-          <span class="text-muted" style="font-size: 0.72rem;">FLEET HEALTH</span>
+          <span class="text-muted" style="font-size: 0.72rem;">SERVER HEALTH</span>
           <span class="status-dot online"></span>
         </div>
         <div class="fw-bold" id="sidebar-fleet-status">All Systems Healthy</div>
@@ -72,65 +78,53 @@
           <i class="bi bi-list fs-5"></i>
         </button>
         <div>
-          <span class="env-badge me-2">Production</span>
-          <span class="fw-bold fs-6 d-none d-sm-inline">Linux Fleet Monitoring</span>
+          <span class="fw-bold fs-6 d-none d-sm-inline">Linux Server Monitor</span>
         </div>
       </div>
 
       <div class="dash-header-right">
-        <!-- Live status -->
-        <div class="live-indicator d-none d-md-flex">
-          <span class="status-dot online"></span>
-          <span>Live Telemetry</span>
+        <div class="server-search-box dashboard-search-box">
+          <i class="bi bi-search"></i>
+          <input type="text" class="server-search-input" id="server-search-input" placeholder="Search servers, IPs..." aria-label="Search servers">
         </div>
 
-        <!-- 30s Countdown Ticker Badge -->
-        <div class="countdown-badge d-none d-sm-flex align-items-center" id="refresh-countdown-badge" title="Auto-refresh countdown">
-          <i class="bi bi-stopwatch text-primary me-1"></i>
-          <span>Next poll: <strong id="refresh-countdown-sec">30</strong>s</span>
-        </div>
-
-        <!-- Auto-refresh interval dropdown -->
-        <div class="dropdown">
-          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="auto-refresh-menu" data-bs-toggle="dropdown" aria-expanded="false">
-            <i class="bi bi-clock-history me-1"></i>
-            <span id="auto-refresh-label">Refresh: 30s</span>
-          </button>
-          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="auto-refresh-menu">
-            <li><button class="dropdown-item" data-interval="15000">Every 15 seconds</button></li>
-            <li><button class="dropdown-item active-refresh" data-interval="30000">Every 30 seconds</button></li>
-            <li><button class="dropdown-item" data-interval="60000">Every 60 seconds</button></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><button class="dropdown-item text-danger" data-interval="0">Pause Auto-refresh</button></li>
-          </ul>
-        </div>
-
-        <!-- Manual Refresh Button -->
         <button class="btn btn-sm btn-primary d-flex align-items-center gap-1" id="btn-refresh-all" title="Trigger immediate refresh">
           <i class="bi bi-arrow-clockwise" id="refresh-icon"></i>
           <span class="d-none d-sm-inline">Refresh</span>
         </button>
 
-        <!-- Last Updated -->
-        <span class="text-muted d-none d-xl-inline" style="font-size: 0.8rem;">
-          Updated: <span id="last-updated-time" class="fw-medium text-light font-monospace">--:--:--</span>
-        </span>
+        <!-- Auto-refresh interval dropdown -->
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="auto-refresh-menu" data-bs-toggle="dropdown" aria-expanded="false" title="Choose refresh interval">
+            <i class="bi bi-clock-history"></i>
+            <span class="visually-hidden">Refresh interval</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="auto-refresh-menu">
+            <li><button class="dropdown-item active-refresh" data-interval="30000">Every 30 seconds</button></li>
+            <li><button class="dropdown-item" data-interval="20000">Every 20 seconds</button></li>
+            <li><button class="dropdown-item" data-interval="15000">Every 15 seconds</button></li>
+            <li><button class="dropdown-item" data-interval="10000">Every 10 seconds</button></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><button class="dropdown-item text-danger" data-interval="0">Pause auto-refresh</button></li>
+          </ul>
+        </div>
 
-        <!-- Theme Toggle -->
-        <button class="btn btn-sm btn-outline-secondary" id="btn-theme-toggle" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
-          <i class="bi bi-moon-stars" id="theme-toggle-icon"></i>
-        </button>
-
-        <!-- Administrator Account -->
         {% if request.user.is_authenticated %}
+          <div class="dashboard-user-summary d-none d-xl-block">
+            <div class="dashboard-user-name">{{ request.user.email|default:request.user.name }}</div>
+            <div class="dashboard-user-login">
+              Last login: {{ request.user.last_login|date:"d M Y, H:i"|default:"Never" }}
+            </div>
+          </div>
           <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="bi bi-shield-lock-fill text-primary"></i>
-              <span class="d-none d-md-inline font-monospace">{{ request.user.email|default:request.user.username }}</span>
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Profile and settings" aria-label="Profile and settings">
+              <i class="bi bi-person-circle"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-              <li><h6 class="dropdown-header">System Administrator</h6></li>
-              <li><a class="dropdown-item" href="{% url 'admin:index' %}" target="_blank"><i class="bi bi-sliders me-2 text-primary"></i>Django Admin</a></li>
+              <li><h6 class="dropdown-header">{{ request.user.email|default:request.user.username }}</h6></li>
+              <li><a class="dropdown-item" href="{% url 'admin:index' %}" target="_blank"><i class="bi bi-shield-lock me-2 text-primary"></i>Profile</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="{% url 'settings' %}"><i class="bi bi-gear me-2"></i>Settings</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item text-danger" href="{% url 'account_logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Sign Out</a></li>
             </ul>
@@ -155,32 +149,12 @@
         </div>
       </div>
 
-      <!-- ================= LIVE 30s REFRESH RESULT BANNER ================= -->
-      <div id="live-refresh-bar" class="live-refresh-bar">
-        <div class="d-flex align-items-center gap-2 flex-wrap flex-grow-1">
-          <div class="d-flex align-items-center gap-2">
-            <span class="status-dot online" id="live-refresh-dot"></span>
-            <span class="fw-bold fs-7 text-light">30s Telemetry Poll:</span>
-            <span class="text-secondary small font-monospace" id="live-refresh-time">--:--:--</span>
-          </div>
-          <span class="vr mx-2 d-none d-md-inline" style="opacity: 0.25;"></span>
-          <div class="live-refresh-metrics d-flex align-items-center gap-2 flex-wrap" id="live-refresh-metrics">
-            <span class="badge bg-secondary font-monospace">Synchronizing telemetry...</span>
-          </div>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge badge-soft-success font-monospace" id="live-refresh-status-badge">
-            <i class="bi bi-check-circle-fill me-1"></i> 200 OK
-          </span>
-        </div>
-      </div>
-
       <!-- ================= SECTION 1: SUMMARY KPI CARDS ================= -->
       <section id="section-overview">
         <div class="row g-3">
           <!-- KPI 1: Total Servers -->
           <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
-            <div class="dash-card kpi-card">
+            <a class="dash-card kpi-card kpi-card-link" href="{% url 'admin:servers_server_changelist' %}" title="View all registered servers">
               <div class="kpi-top">
                 <span class="kpi-label">Total Servers</span>
                 <div class="kpi-icon-box kpi-icon-servers">
@@ -194,12 +168,12 @@
                 <span class="badge bg-secondary">Registered</span>
                 <span>Active fleet</span>
               </div>
-            </div>
+            </a>
           </div>
 
           <!-- KPI 2: Online Servers -->
           <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
-            <div class="dash-card kpi-card">
+            <a class="dash-card kpi-card kpi-card-link" href="{% url 'admin:servers_server_changelist' %}?status__exact=UP" title="View online servers">
               <div class="kpi-top">
                 <span class="kpi-label">Online Servers</span>
                 <div class="kpi-icon-box kpi-icon-online">
@@ -213,12 +187,12 @@
                 <span class="badge bg-success">100%</span>
                 <span>Responsive</span>
               </div>
-            </div>
+            </a>
           </div>
 
           <!-- KPI 3: Offline Servers -->
           <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
-            <div class="dash-card kpi-card">
+            <a class="dash-card kpi-card kpi-card-link" href="{% url 'admin:servers_server_changelist' %}?status__exact=DOWN" title="View offline servers">
               <div class="kpi-top">
                 <span class="kpi-label">Offline Servers</span>
                 <div class="kpi-icon-box kpi-icon-offline">
@@ -232,12 +206,12 @@
                 <span class="badge bg-secondary">0 Issues</span>
                 <span>All connected</span>
               </div>
-            </div>
+            </a>
           </div>
 
           <!-- KPI 4: Active Alerts -->
           <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
-            <div class="dash-card kpi-card">
+            <a class="dash-card kpi-card kpi-card-link" href="{% url 'alerts' %}?status=ACTIVE" title="View active alerts">
               <div class="kpi-top">
                 <span class="kpi-label">Active Alerts</span>
                 <div class="kpi-icon-box kpi-icon-alerts">
@@ -251,14 +225,14 @@
                 <span class="badge bg-secondary">0 Critical</span>
                 <span>Fleet normal</span>
               </div>
-            </div>
+            </a>
           </div>
 
           <!-- KPI 5: Fleet Avg CPU (with 30s variation Δ) -->
           <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
-            <div class="dash-card kpi-card">
+            <a class="dash-card kpi-card kpi-card-link" href="#section-metrics" title="View CPU resource metrics">
               <div class="kpi-top">
-                <span class="kpi-label">Fleet Avg CPU</span>
+                <span class="kpi-label">Avg CPU utilization</span>
                 <div class="kpi-icon-box" style="background: var(--dash-info-subtle); color: var(--dash-info);">
                   <i class="bi bi-cpu"></i>
                 </div>
@@ -270,14 +244,14 @@
                 <span class="badge-delta badge-delta-neutral font-monospace" id="stat-avg-cpu-delta">0.00%</span>
                 <span class="small text-muted">30s Δ</span>
               </div>
-            </div>
+            </a>
           </div>
 
           <!-- KPI 6: Fleet Avg RAM (with 30s variation Δ) -->
           <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
-            <div class="dash-card kpi-card">
+            <a class="dash-card kpi-card kpi-card-link" href="#section-metrics" title="View RAM resource metrics">
               <div class="kpi-top">
-                <span class="kpi-label">Fleet Avg RAM</span>
+                <span class="kpi-label">Avg RAM utilization</span>
                 <div class="kpi-icon-box" style="background: var(--dash-success-subtle); color: var(--dash-success);">
                   <i class="bi bi-memory"></i>
                 </div>
@@ -289,7 +263,7 @@
                 <span class="badge-delta badge-delta-neutral font-monospace" id="stat-avg-memory-delta">0.00%</span>
                 <span class="small text-muted">30s Δ</span>
               </div>
-            </div>
+            </a>
           </div>
         </div>
       </section>
@@ -302,16 +276,9 @@
               <i class="bi bi-server text-primary"></i>
               Server Health & Status
             </h2>
-            <span class="text-muted" style="font-size: 0.8rem;">Live health telemetry collected via SSH</span>
           </div>
 
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <!-- Search -->
-            <div class="server-search-box">
-              <i class="bi bi-search"></i>
-              <input type="text" class="server-search-input" id="server-search-input" placeholder="Search servers, IPs..." aria-label="Search servers">
-            </div>
-
             <!-- Status Filter Buttons -->
             <div class="btn-group btn-group-sm" role="group" aria-label="Filter servers by status">
               <button type="button" class="btn btn-outline-secondary active" data-server-filter="ALL">All</button>
@@ -329,19 +296,16 @@
               <tr>
                 <th>Server & Hostname</th>
                 <th>Status</th>
-                <th>CPU Usage (30s Δ)</th>
-                <th>Memory Usage (30s Δ)</th>
-                <th>Disk Space (30s Δ)</th>
-                <th>Network Traffic (30s Δ)</th>
                 <th>Last Checked</th>
                 <th>Alerts</th>
+                <th class="text-center">Analyze</th>
                 <th class="text-end">Actions</th>
               </tr>
             </thead>
             <tbody id="servers-table-body">
               <!-- Loading Skeletons -->
               <tr>
-                <td colspan="9">
+                <td colspan="6">
                   <div class="d-flex flex-column gap-2 py-3">
                     <div class="skeleton-box" style="height: 24px; width: 100%;"></div>
                     <div class="skeleton-box" style="height: 24px; width: 100%;"></div>
@@ -369,17 +333,12 @@
           <div>
             <h2 class="dash-card-title">
               <i class="bi bi-graph-up text-info"></i>
-              Resource Telemetry & Trends
+              Total Analysis
             </h2>
-            <span class="text-muted" style="font-size: 0.8rem;">Historical CPU, Memory, Disk, and Network samples</span>
           </div>
 
           <div class="d-flex align-items-center gap-2 flex-wrap">
-            <!-- Server Selector -->
-            <select class="form-select form-select-sm" id="chart-server-select" style="max-width: 220px; background-color: var(--dash-bg); color: var(--dash-text-primary); border-color: var(--dash-border);" aria-label="Select server for charts">
-              <option value="">Loading servers...</option>
-            </select>
-
+            <span class="badge badge-soft-info" id="analysis-scope-label">Average across all registered servers</span>
             <!-- Time Range Selector -->
             <div class="btn-group btn-group-sm" role="group" aria-label="Time range selector">
               <button type="button" class="btn btn-outline-secondary" data-range="1h">1h</button>
@@ -458,53 +417,16 @@
         </div>
       </section>
 
-      <!-- ================= SECTION 4: ALERTS & INCIDENTS ================= -->
-      <section id="section-alerts" class="dash-card">
-        <div class="dash-card-header flex-wrap gap-2">
-          <div>
-            <h2 class="dash-card-title">
-              <i class="bi bi-shield-exclamation text-warning"></i>
-              Alerts & Incident Feed
-            </h2>
-            <span class="text-muted" style="font-size: 0.8rem;">System alerts triggered by thresholds and connection status</span>
-          </div>
-
-          <div class="btn-group btn-group-sm" role="group" aria-label="Filter alerts">
-            <button type="button" class="btn btn-outline-secondary active" data-alert-filter="ACTIVE">Active</button>
-            <button type="button" class="btn btn-outline-secondary" data-alert-filter="CRITICAL">Critical</button>
-            <button type="button" class="btn btn-outline-secondary" data-alert-filter="WARNING">Warning</button>
-            <button type="button" class="btn btn-outline-secondary" data-alert-filter="RESOLVED">Resolved</button>
-            <button type="button" class="btn btn-outline-secondary" data-alert-filter="ALL">All</button>
-          </div>
-        </div>
-
-        <div id="alerts-list-container" class="d-flex flex-column gap-2">
-          <!-- Injected dynamically via dashboard.js -->
-        </div>
-
-        <div id="alerts-empty-state" class="empty-state-box">
-          <div class="empty-state-icon">
-            <i class="bi bi-shield-check text-success"></i>
-          </div>
-          <h5 class="text-light">All Systems Normal</h5>
-          <p class="text-muted small mb-0">No active alerts detected across the fleet.</p>
-        </div>
-      </section>
-
       <!-- ================= SECTION 5: LIVE 30S REFRESH & MONITORING STREAM ================= -->
       <section id="section-activity" class="dash-card">
         <div class="dash-card-header flex-wrap gap-2">
           <div>
             <h2 class="dash-card-title">
               <i class="bi bi-clock-history text-secondary"></i>
-              Live 30s Refresh & System Monitoring Stream
+              Refresh & System Monitoring Stream
             </h2>
-            <span class="text-muted" style="font-size: 0.8rem;">Chronological telemetry stream captured every 30-second monitoring cycle</span>
+            <span class="text-muted" style="font-size: 0.8rem;">Captured readings</span>
           </div>
-          <span class="badge badge-soft-info d-flex align-items-center gap-1 font-monospace">
-            <span class="status-dot online"></span>
-            <span>30s Active Stream</span>
-          </span>
         </div>
         <div class="dash-table-wrapper">
           <table class="dash-table" id="activity-table">
@@ -521,7 +443,16 @@
             <tbody id="activity-table-body">
               <!-- Dynamically populated -->
             </tbody>
+            <tbody id="activity-history-body" class="d-none">
+              <!-- Historical cycles are shown on demand -->
+            </tbody>
           </table>
+          <div class="text-center border-top border-secondary border-opacity-25 pt-3 mt-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="activity-history-toggle" aria-expanded="false" aria-controls="activity-history-body">
+              <i class="bi bi-clock-history me-1"></i>
+              <span>Show history</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -642,6 +573,16 @@
           </div>
         </div>
 
+        <h6 class="fw-bold text-light mb-2">Most Used Resources</h6>
+        <div class="p-3 border rounded mb-4" style="border-color: var(--dash-border) !important; background-color: var(--dash-surface-subtle);">
+          <div class="d-flex align-items-center gap-2 flex-wrap" id="modal-resource-summary">
+            <span class="badge badge-soft-info">CPU: --</span>
+            <span class="badge badge-soft-success">RAM: --</span>
+            <span class="badge badge-soft-warning">Disk: --</span>
+            <span class="badge badge-soft-danger">Highest: --</span>
+          </div>
+        </div>
+
         <!-- Diagnostics / Error section -->
         <div id="modal-error-box" class="d-none mb-3">
           <h6 class="fw-bold text-danger mb-2"><i class="bi bi-exclamation-triangle me-1"></i> Diagnostic Error Log</h6>
@@ -669,6 +610,49 @@
         <button type="button" class="btn btn-sm btn-success" id="btn-modal-collect">
           <i class="bi bi-arrow-repeat me-1"></i> Collect Metrics Now
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Report timeframe dialog -->
+<div class="modal fade dash-modal" id="reportTimeframeModal" tabindex="-1" aria-labelledby="reportTimeframeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="reportTimeframeModalLabel"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Generate server report</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Choose the time range for the server report.</p>
+        <div class="d-grid gap-2">
+          <label class="btn btn-outline-secondary text-start"><input class="form-check-input me-2" type="radio" name="report-range" value="1d" checked>Last 1 day</label>
+          <label class="btn btn-outline-secondary text-start"><input class="form-check-input me-2" type="radio" name="report-range" value="3d">Last 3 days</label>
+          <label class="btn btn-outline-secondary text-start"><input class="form-check-input me-2" type="radio" name="report-range" value="1w">Last 1 week</label>
+          <label class="btn btn-outline-secondary text-start"><input class="form-check-input me-2" type="radio" name="report-range" value="1m">Last 1 month</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-sm btn-danger" id="btn-generate-report"><i class="bi bi-file-earmark-arrow-down me-1"></i>Generate PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade dash-modal" id="reportPreviewModal" tabindex="-1" aria-labelledby="reportPreviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" style="height: 90vh;">
+      <div class="modal-header">
+        <h5 class="modal-title" id="reportPreviewModalLabel"><i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Server report</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <iframe id="report-pdf-frame" title="Server monitoring report" style="border:0; width:100%; height:100%;"></iframe>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-download-report"><i class="bi bi-download me-1"></i>Download PDF</button>
       </div>
     </div>
   </div>

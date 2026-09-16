@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}Alerts & Incident Feed | Linux Server Monitor{% endblock title %}
+
+{% block bodyclass %}alerts-body{% endblock bodyclass %}
+
+{% block css %}
+  {{ block.super }}
+  <style>
+    body.alerts-body {
+      background: var(--dash-bg);
+      color: var(--dash-text-primary);
+      min-height: 100vh;
+    }
+
+    .alerts-page {
+      max-width: 1120px;
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+    }
+
+    .alerts-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .alerts-header h1 {
+      font-weight: 800;
+      margin-bottom: 0.4rem;
+    }
+
+    .alerts-card {
+      background: var(--dash-surface);
+      border: 1px solid var(--dash-border);
+      border-radius: 10px;
+      box-shadow: var(--dash-card-shadow);
+      padding: 1.25rem;
+    }
+
+    .alerts-filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .alert-item-card {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem;
+      border: 1px solid var(--dash-border);
+      border-radius: 8px;
+      background: var(--dash-surface-hover);
+    }
+
+    .alert-item-card.critical { border-left: 3px solid var(--dash-danger); }
+    .alert-item-card.warning { border-left: 3px solid var(--dash-warning); }
+    .alert-item-card.info { border-left: 3px solid var(--dash-info); }
+
+    @media (max-width: 640px) {
+      .alerts-header,
+      .alert-item-card { flex-direction: column; }
+    }
+  </style>
+{% endblock css %}
+
+{% block body %}
+  <main class="alerts-page" id="alerts-page">
+    {% csrf_token %}
+    <div class="alerts-header">
+      <div>
+        <a class="btn btn-sm btn-outline-secondary mb-3" href="{% url 'home' %}">
+          <i class="bi bi-arrow-left me-1"></i>Back to monitor
+        </a>
+        <h1><i class="bi bi-shield-exclamation text-warning me-2"></i>Alerts & Incident Feed</h1>
+        <p class="text-muted mb-0">System alerts triggered by thresholds and connection status.</p>
+      </div>
+      <span class="badge badge-soft-danger" id="alerts-count">Loading alerts...</span>
+    </div>
+
+    <section class="alerts-card">
+      <div class="alerts-filter-bar" role="group" aria-label="Filter alerts">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-alert-filter="ACTIVE">Active</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-alert-filter="CRITICAL">Critical</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-alert-filter="WARNING">Warning</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-alert-filter="RESOLVED">Resolved</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary active" data-alert-filter="ALL">All</button>
+      </div>
+
+      <div id="alerts-list-container" class="d-flex flex-column gap-2"></div>
+      <div id="alerts-empty-state" class="text-center text-muted py-5 d-none">
+        <i class="bi bi-shield-check text-success fs-2"></i>
+        <p class="mt-2 mb-0">No alerts match this filter.</p>
+      </div>
+    </section>
+  </main>
+{% endblock body %}
+
+{% block inline_javascript %}
+  <script>
+    (() => {
+      const list = document.getElementById('alerts-list-container');
+      const empty = document.getElementById('alerts-empty-state');
+      const count = document.getElementById('alerts-count');
+      let activeFilter = 'ALL';
+      let alerts = [];
+
+      function csrfToken() {
+        const formToken = document.querySelector('[name="csrfmiddlewaretoken"]')?.value;
+        if (formToken) return formToken;
+        const cookie = document.cookie.split('; ').find(item => item.startsWith('csrftoken='));
+        return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
+      }
+
+      function escapeHtml(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function relativeTime(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'Recently';
+        const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+        if (seconds < 60) return `${seconds}s ago`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        return `${Math.floor(hours / 24)}d ago`;
+      }
+
+      function filteredAlerts() {
+        if (activeFilter === 'ALL') return alerts;
+        if (activeFilter === 'CRITICAL' || activeFilter === 'WARNING') {
+          return alerts.filter(alert => alert.severity === activeFilter && alert.status === 'ACTIVE');
+        }
+        return alerts.filter(alert => alert.status === activeFilter);
+      }
+
+      function render() {
+        const visible = filteredAlerts();
+        count.textContent = `${visible.length} ${activeFilter.toLowerCase()} alert${visible.length === 1 ? '' : 's'}`;
+        empty.classList.toggle('d-none', visible.length > 0);
+        list.innerHTML = visible.map(alert => {
+          const severity = (alert.severity || 'INFO').toLowerCase();
+          const severityBadge = alert.severity === 'CRITICAL'
+            ? '<span class="badge bg-danger">CRITICAL</span>'
+            : alert.severity === 'WARNING'
+              ? '<span class="badge bg-warning text-dark">WARNING</span>'
+              : '<span class="badge bg-info">INFO</span>';
+          const statusBadge = alert.status === 'ACTIVE'
+            ? '<span class="badge badge-soft-danger">ACTIVE</span>'
+            : '<span class="badge badge-soft-success">RESOLVED</span>';
+          const action = alert.status === 'ACTIVE'
+            ? `<button type="button" class="btn btn-sm btn-outline-success resolve-alert" data-id="${alert.id}"><i class="bi bi-check-lg me-1"></i>Resolve</button>`
+            : '<span class="text-muted small"><i class="bi bi-check2-all text-success me-1"></i>Resolved</span>';
+          return `
+            <article class="alert-item-card ${severity}">
+              <div class="d-flex align-items-start gap-3">
+                <div>${severityBadge}</div>
+                <div>
+                  <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <strong>${escapeHtml(alert.title)}</strong>
+                    <span class="badge badge-soft-info">${escapeHtml(alert.server_name)}</span>
+                    ${statusBadge}
+                  </div>
+                  <p class="text-muted small mb-1">${escapeHtml(alert.message || 'No additional details.')}</p>
+                  <span class="text-muted small"><i class="bi bi-clock me-1"></i>${relativeTime(alert.created_at)}</span>
+                </div>
+              </div>
+              <div>${action}</div>
+            </article>`;
+        }).join('');
+
+        list.querySelectorAll('.resolve-alert').forEach(button => {
+          button.addEventListener('click', async () => {
+            button.disabled = true;
+            try {
+              const response = await fetch(`/api/alerts/${button.dataset.id}/resolve/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken(), 'Accept': 'application/json' },
+              });
+              if (!response.ok) throw new Error(`Resolve failed: ${response.status}`);
+              await loadAlerts();
+            } catch (error) {
+              button.disabled = false;
+              window.alert(error.message);
+            }
+          });
+        });
+      }
+
+      async function loadAlerts() {
+        const response = await fetch('/api/alerts/', {
+          credentials: 'same-origin',
+          headers: { 'Accept': 'application/json' },
+        });
+        if (!response.ok) throw new Error(`Alerts request failed: ${response.status}`);
+        const payload = await response.json();
+        alerts = Array.isArray(payload) ? payload : (payload.results || []);
+        render();
+        await fetch('/api/alerts/mark-read/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-CSRFToken': csrfToken(), 'Accept': 'application/json' },
+        });
+      }
+
+      document.querySelectorAll('[data-alert-filter]').forEach(button => {
+        button.addEventListener('click', () => {
+          document.querySelectorAll('[data-alert-filter]').forEach(item => item.classList.remove('active'));
+          button.classList.add('active');
+          activeFilter = button.dataset.alertFilter;
+          render();
+        });
+      });
+
+      loadAlerts().catch(error => {
+        count.textContent = 'Unable to load alerts';
+        list.innerHTML = `<p class="text-danger mb-0">${escapeHtml(error.message)}</p>`;
+      });
+    })();
+  </script>
+{% endblock inline_javascript %}

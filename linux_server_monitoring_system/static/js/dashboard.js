@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
     servers: [],
     stats: null,
     alerts: [],
+    selectedServerIds: [],
+    reportBlobUrl: null,
+    reportFilename: null,
     currentServerFilter: 'ALL',
     searchQuery: '',
     currentAlertFilter: 'ACTIVE',
@@ -69,7 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
     chartServerSelect: document.getElementById('chart-server-select'),
     alertsListContainer: document.getElementById('alerts-list-container'),
     alertsEmptyState: document.getElementById('alerts-empty-state'),
+    alertUnreadDot: document.getElementById('alert-unread-dot'),
     activityTableBody: document.getElementById('activity-table-body'),
+    activityHistoryBody: document.getElementById('activity-history-body'),
+    activityHistoryToggle: document.getElementById('activity-history-toggle'),
+    analysisScopeLabel: document.getElementById('analysis-scope-label'),
     errorBanner: document.getElementById('dash-error-banner'),
     errorMessage: document.getElementById('dash-error-message'),
     btnErrorRetry: document.getElementById('btn-error-retry'),
@@ -96,6 +103,12 @@ document.addEventListener('DOMContentLoaded', () => {
     modalNetTotal: document.getElementById('modal-net-total'),
     modalErrorBox: document.getElementById('modal-error-box'),
     modalErrorText: document.getElementById('modal-error-text'),
+    modalResourceSummary: document.getElementById('modal-resource-summary'),
+    reportTimeframeModal: document.getElementById('reportTimeframeModal'),
+    reportPreviewModal: document.getElementById('reportPreviewModal'),
+    reportPdfFrame: document.getElementById('report-pdf-frame'),
+    downloadReportBtn: document.getElementById('btn-download-report'),
+    generateReportBtn: document.getElementById('btn-generate-report'),
     modalSshOutput: document.getElementById('modal-ssh-output'),
     btnModalTestSsh: document.getElementById('btn-modal-test-ssh'),
     btnModalCollect: document.getElementById('btn-modal-collect'),
@@ -112,6 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Helper: Get CSRF Token
   function getCsrfToken() {
+    const formToken = document.querySelector('[name="csrfmiddlewaretoken"]')?.value;
+    if (formToken) return formToken;
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
       const cookies = document.cookie.split(';');
@@ -123,7 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     }
-    return cookieValue || '';
+    if (cookieValue) return cookieValue;
+    return document.querySelector('[name="csrfmiddlewaretoken"]')?.value || '';
   }
 
   // Helper: Toast Notifications
@@ -254,8 +270,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ================= API CALLS =================
 
   async function apiFetch(url, options = {}) {
-    const res = await fetch(url, options);
+    const res = await fetch(url, { credentials: 'same-origin', ...options });
     if (res.status === 401 || res.status === 403) {
+      if (options.method === 'POST') return res;
       window.location.href = `/accounts/login/?next=${encodeURIComponent(window.location.pathname)}`;
       throw new Error('Authentication required');
     }
@@ -294,6 +311,15 @@ document.addEventListener('DOMContentLoaded', () => {
     return await res.json();
   }
 
+  async function fetchFleetMetrics(range = '24h', serverIds = []) {
+    const selected = serverIds.length > 0 ? `&server_ids=${serverIds.join(',')}` : '';
+    const res = await apiFetch(`/api/servers/fleet-metrics/?range=${range}${selected}`, {
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!res.ok) throw new Error(`Fleet metrics HTTP ${res.status}`);
+    return await res.json();
+  }
+
   async function testServerSSH(serverId) {
     const res = await apiFetch(`/api/servers/${serverId}/test_connection/`, {
       method: 'POST',
@@ -302,7 +328,12 @@ document.addEventListener('DOMContentLoaded', () => {
         'X-CSRFToken': getCsrfToken(),
       },
     });
-    return await res.json();
+    if (!res.ok) return { success: false, message: 'SSH Connection failed.' };
+    try {
+      return await res.json();
+    } catch (error) {
+      return { success: false, message: 'SSH Connection failed.' };
+    }
   }
 
   async function collectServerMetricsNow(serverId) {
@@ -458,28 +489,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.serversEmptyState) el.serversEmptyState.classList.add('d-none');
 
     const rowsHtml = filtered.map(server => {
-      const m = server.latest_metrics;
       const statusBadge =
         server.status === 'UP' ? '<span class="badge badge-soft-success"><span class="status-dot online me-1"></span> ONLINE</span>' :
         server.status === 'DOWN' ? '<span class="badge badge-soft-danger"><span class="status-dot offline me-1"></span> OFFLINE</span>' :
         '<span class="badge badge-soft-warning"><span class="status-dot unknown me-1"></span> UNKNOWN</span>';
-
-      const cpuUsage = m && m.cpu ? m.cpu.usage_percent : 0;
-      const cpuLoad = m && m.cpu ? `Load: ${m.cpu.load_1m}, ${m.cpu.load_5m}` : 'Load: N/A';
-      const cpuDeltaPill = renderDeltaPill(m && m.cpu ? m.cpu.delta : 0, '%');
-
-      const memUsage = m && m.memory ? m.memory.usage_percent : 0;
-      const memText = m && m.memory ? `${m.memory.used_gb} / ${m.memory.total_gb} GB` : 'N/A';
-      const memDeltaPill = renderDeltaPill(m && m.memory ? m.memory.delta : 0, '%');
-
-      const diskUsage = m && m.disk ? m.disk.usage_percent : 0;
-      const diskText = m && m.disk ? `${m.disk.used_gb} / ${m.disk.total_gb} GB` : 'N/A';
-      const diskDeltaPill = renderDeltaPill(m && m.disk ? m.disk.delta : 0, '%');
-
-      const netRx = m && m.network ? `${m.network.receive_rate_kbps} KB/s` : '0 KB/s';
-      const netTx = m && m.network ? `${m.network.transmit_rate_kbps} KB/s` : '0 KB/s';
-      const rxDeltaPill = renderDeltaPill(m && m.network ? m.network.rx_delta_kbps : 0, ' KB/s');
-      const txDeltaPill = renderDeltaPill(m && m.network ? m.network.tx_delta_kbps : 0, ' KB/s');
 
       const relativeCheck = formatRelativeTime(server.last_check_at);
 
@@ -488,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : `<span class="badge badge-soft-success"><i class="bi bi-shield-check me-1"></i>Clean</span>`;
 
       return `
-        <tr data-server-id="${server.id}">
+        <tr data-server-id="${server.id}" class="server-analysis-row ${state.selectedServerIds.includes(server.id) ? 'analysis-selected' : ''}" tabindex="0" role="button" aria-label="Select ${escapeHtml(server.server_name)} for analysis">
           <td>
             <div class="server-title">
               <span>${escapeHtml(server.server_name)}</span>
@@ -499,63 +512,14 @@ document.addEventListener('DOMContentLoaded', () => {
           </td>
           <td>${statusBadge}</td>
           <td>
-            <div class="metric-meter" title="${cpuLoad}">
-              <div class="metric-meter-label">
-                <span>CPU</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span>${cpuUsage}%</span>
-                  ${cpuDeltaPill}
-                </div>
-              </div>
-              <div class="meter-track">
-                <div class="meter-fill ${getMeterColorClass(cpuUsage)}" style="width: ${Math.min(100, Math.max(0, cpuUsage))}%;"></div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div class="metric-meter" title="${memText}">
-              <div class="metric-meter-label">
-                <span>RAM</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span>${memUsage}%</span>
-                  ${memDeltaPill}
-                </div>
-              </div>
-              <div class="meter-track">
-                <div class="meter-fill ${getMeterColorClass(memUsage)}" style="width: ${Math.min(100, Math.max(0, memUsage))}%;"></div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div class="metric-meter" title="${diskText}">
-              <div class="metric-meter-label">
-                <span>Disk</span>
-                <div class="d-flex align-items-center gap-1">
-                  <span>${diskUsage}%</span>
-                  ${diskDeltaPill}
-                </div>
-              </div>
-              <div class="meter-track">
-                <div class="meter-fill ${getMeterColorClass(diskUsage)}" style="width: ${Math.min(100, Math.max(0, diskUsage))}%;"></div>
-              </div>
-            </div>
-          </td>
-          <td>
-            <div style="font-size: 0.78rem;">
-              <div class="d-flex align-items-center gap-1">
-                <span class="text-info"><i class="bi bi-arrow-down-short"></i>${netRx}</span>
-                ${rxDeltaPill}
-              </div>
-              <div class="d-flex align-items-center gap-1 mt-1">
-                <span class="text-primary"><i class="bi bi-arrow-up-short"></i>${netTx}</span>
-                ${txDeltaPill}
-              </div>
-            </div>
-          </td>
-          <td>
             <span class="small font-monospace" title="${server.last_check_at || ''}">${relativeCheck}</span>
           </td>
           <td>${alertBadge}</td>
+          <td class="text-center">
+            <label class="server-analysis-check" title="Include this server in Total Analysis">
+              <input type="checkbox" class="form-check-input server-analysis-checkbox" data-id="${server.id}" ${state.selectedServerIds.includes(server.id) ? 'checked' : ''} aria-label="Analyze ${escapeHtml(server.server_name)}">
+            </label>
+          </td>
           <td class="text-end">
             <div class="btn-group btn-group-sm">
               <button class="btn btn-outline-primary btn-server-details" data-id="${server.id}" title="View Telemetry">
@@ -575,6 +539,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.serversTableBody.innerHTML = rowsHtml;
 
+    el.serversTableBody.querySelectorAll('.server-analysis-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        const serverId = parseInt(checkbox.getAttribute('data-id'), 10);
+        if (checkbox.checked) {
+          state.selectedServerIds = [...new Set([...state.selectedServerIds, serverId])];
+        } else {
+          state.selectedServerIds = state.selectedServerIds.filter(id => id !== serverId);
+        }
+        checkbox.closest('.server-analysis-row').classList.toggle('analysis-selected', checkbox.checked);
+        updateCharts();
+      });
+    });
+
+    el.serversTableBody.querySelectorAll('.server-analysis-row').forEach(row => {
+      const toggleSelection = () => {
+        const checkbox = row.querySelector('.server-analysis-checkbox');
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+
+      row.addEventListener('click', event => {
+        if (event.target.closest('button, a, input, label')) return;
+        toggleSelection();
+      });
+
+      row.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleSelection();
+      });
+    });
+
     // Attach row button events
     el.serversTableBody.querySelectorAll('.btn-server-details').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -593,13 +589,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const res = await testServerSSH(id);
           if (res.success) {
-            showToast(`SSH Test Success: Connected to ${res.hostname || 'server'}`, 'success');
+            showToast('SSH Connection Success', 'success');
           } else {
-            showToast(`SSH Test Failed: ${res.message}`, 'danger');
+            showToast('SSH Connection failed.', 'danger');
           }
           await refreshAll(true);
         } catch (err) {
-          showToast(`SSH error: ${err.message}`, 'danger');
+          showToast('SSH Connection failed.', 'danger');
         } finally {
           btn.disabled = false;
           btn.innerHTML = origHtml;
@@ -608,26 +604,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     el.serversTableBody.querySelectorAll('.btn-server-collect').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = parseInt(btn.getAttribute('data-id'), 10);
-        const origHtml = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
-
-        try {
-          const res = await collectServerMetricsNow(id);
-          if (res.success) {
-            showToast('Live metrics collected successfully!', 'success');
-          } else {
-            showToast(`Collection failed: ${res.message}`, 'danger');
-          }
-          await refreshAll(true);
-        } catch (err) {
-          showToast(`Collection error: ${err.message}`, 'danger');
-        } finally {
-          btn.disabled = false;
-          btn.innerHTML = origHtml;
-        }
+      btn.addEventListener('click', () => {
+        openReportTimeframeModal(parseInt(btn.getAttribute('data-id'), 10));
       });
     });
   }
@@ -671,10 +649,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function updateCharts() {
-    if (!state.selectedServerId) return;
-
+    if (el.analysisScopeLabel) {
+      el.analysisScopeLabel.textContent = state.selectedServerIds.length === 0
+        ? 'Average across all registered servers'
+        : state.selectedServerIds.length === 1
+          ? 'Analysis for 1 selected server'
+          : `Average of ${state.selectedServerIds.length} selected servers`;
+    }
     try {
-      const data = await fetchServerMetrics(state.selectedServerId, state.selectedRange);
+      const data = await fetchFleetMetrics(state.selectedRange, state.selectedServerIds);
       renderChartsData(data);
     } catch (err) {
       console.warn('Error updating charts:', err);
@@ -712,7 +695,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const pointRadius = (data.cpu || []).length > 60 ? 2 : 4;
 
-    // 1. CPU Chart
+    // 1. Fleet-average CPU chart
     const cpuCtx = document.getElementById('chart-cpu')?.getContext('2d');
     if (cpuCtx) {
       if (state.charts.cpu) state.charts.cpu.destroy();
@@ -722,7 +705,7 @@ document.addEventListener('DOMContentLoaded', () => {
           labels: formattedLabels,
           datasets: [
             {
-              label: 'CPU Usage (%)',
+              label: 'Average CPU Usage (%)',
               data: data.cpu || [],
               borderColor: '#6366f1',
               backgroundColor: 'rgba(99, 102, 241, 0.15)',
@@ -733,7 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
               pointHoverRadius: 6,
             },
             {
-              label: '1m Load Average',
+              label: 'Average 1m Load',
               data: data.load_1m || [],
               borderColor: '#f59e0b',
               borderDash: [4, 4],
@@ -758,7 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
           labels: formattedLabels,
           datasets: [
             {
-              label: 'Memory Usage (%)',
+              label: 'Average Memory Usage (%)',
               data: data.memory || [],
               borderColor: '#10b981',
               backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -784,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
           labels: formattedLabels,
           datasets: [
             {
-              label: 'Disk Usage (%)',
+              label: 'Average Disk Usage (%)',
               data: data.disk || [],
               borderColor: '#f59e0b',
               backgroundColor: 'rgba(245, 158, 11, 0.15)',
@@ -810,7 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
           labels: formattedLabels,
           datasets: [
             {
-              label: 'Receive Rate (KB/s)',
+              label: 'Average Receive Rate (KB/s)',
               data: data.network_rx || [],
               borderColor: '#0ea5e9',
               backgroundColor: 'rgba(14, 165, 233, 0.1)',
@@ -821,7 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
               pointHoverRadius: 6,
             },
             {
-              label: 'Transmit Rate (KB/s)',
+              label: 'Average Transmit Rate (KB/s)',
               data: data.network_tx || [],
               borderColor: '#a855f7',
               backgroundColor: 'rgba(168, 85, 247, 0.1)',
@@ -993,6 +976,11 @@ document.addEventListener('DOMContentLoaded', () => {
         : null;
 
     if (!activityList || activityList.length === 0) {
+      if (el.activityHistoryBody) el.activityHistoryBody.innerHTML = '';
+      if (el.activityHistoryToggle) {
+        el.activityHistoryToggle.classList.add('d-none');
+        el.activityHistoryToggle.setAttribute('aria-expanded', 'false');
+      }
       if (state.servers.length === 0) {
         el.activityTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No monitoring activity recorded yet.</td></tr>';
         return;
@@ -1036,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const rows = activityList.map((item, idx) => {
+    const renderActivityRow = (item, idx) => {
       const isUp = item.status === 'UP';
       const resultBadge = isUp
         ? '<span class="badge badge-soft-success font-monospace"><i class="bi bi-check2-circle me-1"></i>200 OK</span>'
@@ -1078,9 +1066,20 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${resultBadge}</td>
         </tr>
       `;
-    }).join('');
+    };
 
-    el.activityTableBody.innerHTML = rows;
+    el.activityTableBody.innerHTML = renderActivityRow(activityList[0], 0);
+    if (el.activityHistoryBody) {
+      el.activityHistoryBody.innerHTML = activityList.slice(1).map((item, idx) => renderActivityRow(item, idx + 1)).join('');
+      el.activityHistoryBody.classList.add('d-none');
+    }
+    if (el.activityHistoryToggle) {
+      const historyCount = activityList.length - 1;
+      el.activityHistoryToggle.classList.toggle('d-none', historyCount <= 0);
+      el.activityHistoryToggle.setAttribute('aria-expanded', 'false');
+      el.activityHistoryToggle.querySelector('span').textContent = `Show history (${historyCount})`;
+    }
+
   }
 
   // ================= SERVER DRILL-DOWN MODAL =================
@@ -1153,6 +1152,18 @@ document.addEventListener('DOMContentLoaded', () => {
       el.modalNetTotal.textContent = `RX: ${rxMb} MB | TX: ${txMb} MB`;
     }
 
+    if (el.modalResourceSummary) {
+      const resources = [
+        ['CPU', cpuPct, 'badge-soft-info'],
+        ['RAM', memPct, 'badge-soft-success'],
+        ['Disk', diskPct, 'badge-soft-warning'],
+      ];
+      const highest = resources.reduce((top, resource) => resource[1] > top[1] ? resource : top, resources[0]);
+      el.modalResourceSummary.innerHTML = resources.map(([name, value, badge]) =>
+        `<span class="badge ${badge}">${name}: ${Number(value).toFixed(1)}%</span>`
+      ).join('') + `<span class="badge badge-soft-danger">Highest: ${highest[0]}</span>`;
+    }
+
     // Error box
     if (server.last_error) {
       if (el.modalErrorBox) el.modalErrorBox.classList.remove('d-none');
@@ -1169,6 +1180,84 @@ document.addEventListener('DOMContentLoaded', () => {
       const modal = bootstrap.Modal.getOrCreateInstance(el.modalEl);
       modal.show();
     }
+  }
+
+  function openReportTimeframeModal(serverId) {
+    state.selectedServerId = serverId;
+    if (window.bootstrap && el.reportTimeframeModal) {
+      bootstrap.Modal.getOrCreateInstance(el.reportTimeframeModal).show();
+    }
+  }
+
+  async function generateServerReport(serverId, range) {
+    const server = state.servers.find(item => item.id === serverId);
+    if (!server || !window.jspdf) throw new Error('PDF report tools are unavailable.');
+
+    let collectionMessage = 'Readings are included up to the last active time.';
+    try {
+      const collection = await collectServerMetricsNow(serverId);
+      collectionMessage = collection.success
+        ? 'Latest reading included in this report.'
+        : 'Readings are included up to the last active time.';
+    } catch (error) {
+      collectionMessage = 'Readings are included up to the last active time.';
+    }
+    const data = await fetchServerMetrics(serverId, range);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF();
+    pdf.setProperties({
+      title: `${server.server_name} monitoring report`,
+      subject: `Server monitoring report for ${range}`,
+      creator: 'Linux Server Monitor',
+    });
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, 210, 297, 'F');
+    pdf.setTextColor(15, 23, 42);
+    const averages = {
+      cpu: average(data.cpu),
+      memory: average(data.memory),
+      disk: average(data.disk),
+      receive: average(data.network_rx),
+      transmit: average(data.network_tx),
+    };
+    const lines = [
+      'Linux Server Monitor - Server Report',
+      `Server: ${server.server_name}`,
+      `Hostname: ${server.hostname}`,
+      `Report period: ${range}`,
+      `Generated: ${new Date().toLocaleString()}`,
+      collectionMessage,
+      '',
+      'Average readings',
+      `CPU utilization: ${averages.cpu.toFixed(2)}%`,
+      `Memory utilization: ${averages.memory.toFixed(2)}%`,
+      `Disk utilization: ${averages.disk.toFixed(2)}%`,
+      `Network receive: ${averages.receive.toFixed(2)} KB/s`,
+      `Network transmit: ${averages.transmit.toFixed(2)} KB/s`,
+      '',
+      `Samples captured: ${data.labels.length}`,
+      `Current status: ${server.status}`,
+    ];
+    pdf.setFontSize(16);
+    pdf.text(lines[0], 20, 22);
+    pdf.setFontSize(11);
+    lines.slice(1).forEach((line, index) => pdf.text(line, 20, 34 + index * 8));
+    const pdfBlob = new Blob([pdf.output('arraybuffer')], { type: 'application/pdf' });
+    if (!pdfBlob.size) throw new Error('The generated report is empty.');
+    const blobUrl = URL.createObjectURL(pdfBlob);
+    const filename = `${server.server_name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${range}-report.pdf`;
+    state.reportBlobUrl = blobUrl;
+    state.reportFilename = filename;
+    if (el.reportPdfFrame && el.reportPreviewModal) {
+      el.reportPdfFrame.src = blobUrl;
+      bootstrap.Modal.getOrCreateInstance(el.reportPreviewModal).show();
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  }
+
+  function average(values) {
+    const valid = (values || []).filter(value => typeof value === 'number');
+    return valid.length ? valid.reduce((sum, value) => sum + value, 0) / valid.length : 0;
   }
 
   // ================= REFRESH ORCHESTRATION =================
@@ -1193,6 +1282,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       state.servers = servers;
       state.alerts = alerts;
+      if (el.alertUnreadDot) {
+        el.alertUnreadDot.classList.toggle(
+          'd-none',
+          !alerts.some(alert => alert.status === 'ACTIVE' && !alert.is_read),
+        );
+      }
       renderStats(stats);
       renderLiveRefreshBanner(stats, servers);
       renderServersTable();
@@ -1278,6 +1373,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (el.countdownSec) el.countdownSec.textContent = state.countdownSeconds;
       refreshAll(false);
       showToast('Telemetry data refreshed.', 'info');
+    });
+  }
+
+  // Activity history toggle
+  if (el.activityHistoryToggle) {
+    el.activityHistoryToggle.addEventListener('click', () => {
+      const isExpanded = el.activityHistoryToggle.getAttribute('aria-expanded') === 'true';
+      el.activityHistoryToggle.setAttribute('aria-expanded', String(!isExpanded));
+      el.activityHistoryBody.classList.toggle('d-none', isExpanded);
+      el.activityHistoryToggle.querySelector('span').textContent = isExpanded
+        ? `Show history (${el.activityHistoryBody.children.length})`
+        : 'Hide history';
+      el.activityHistoryToggle.querySelector('i').className = isExpanded
+        ? 'bi bi-clock-history me-1'
+        : 'bi bi-chevron-up me-1';
     });
   }
 
@@ -1396,14 +1506,14 @@ document.addEventListener('DOMContentLoaded', () => {
           el.modalSshOutput.innerHTML = `[${new Date().toLocaleTimeString()}] Result: ${res.success ? 'SUCCESS' : 'FAILED'}\nStatus: ${res.status}\nMessage: ${res.message}\nRemote Hostname: ${res.hostname || 'N/A'}\nLast Checked: ${res.last_check_at || 'Now'}`;
         }
         if (res.success) {
-          showToast(`Connected successfully to ${res.hostname || 'server'}`, 'success');
+          showToast('SSH Connection Success', 'success');
         } else {
-          showToast(`SSH failed: ${res.message}`, 'danger');
+          showToast('SSH Connection failed.', 'danger');
         }
         await refreshAll(true);
       } catch (err) {
-        if (el.modalSshOutput) el.modalSshOutput.textContent = `Diagnostic Error: ${err.message}`;
-        showToast(`SSH error: ${err.message}`, 'danger');
+        if (el.modalSshOutput) el.modalSshOutput.textContent = 'SSH Connection failed.';
+        showToast('SSH Connection failed.', 'danger');
       } finally {
         el.btnModalTestSsh.disabled = false;
         el.btnModalTestSsh.innerHTML = origText;
@@ -1413,28 +1523,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Modal Collect Metrics Button
   if (el.btnModalCollect) {
-    el.btnModalCollect.addEventListener('click', async () => {
+    el.btnModalCollect.addEventListener('click', () => {
       if (!state.selectedServerId) return;
-      const origText = el.btnModalCollect.innerHTML;
-      el.btnModalCollect.disabled = true;
-      el.btnModalCollect.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Collecting...';
+      openReportTimeframeModal(state.selectedServerId);
+    });
+  }
 
+  if (el.generateReportBtn) {
+    el.generateReportBtn.addEventListener('click', async () => {
+      if (!state.selectedServerId) return;
+      const range = document.querySelector('input[name="report-range"]:checked')?.value || '1d';
+      const originalText = el.generateReportBtn.innerHTML;
+      el.generateReportBtn.disabled = true;
+      el.generateReportBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Generating...';
       try {
-        const res = await collectServerMetricsNow(state.selectedServerId);
-        if (res.success) {
-          showToast('Fresh metrics collected successfully!', 'success');
-          await refreshAll(true);
-          // Re-populate modal with updated data
-          openServerDetailModal(state.selectedServerId);
-        } else {
-          showToast(`Collection failed: ${res.message}`, 'danger');
-        }
+        bootstrap.Modal.getOrCreateInstance(el.reportTimeframeModal).hide();
+        await generateServerReport(state.selectedServerId, range);
+        showToast('PDF report generated and opened.', 'success');
+        await refreshAll(true);
       } catch (err) {
-        showToast(`Error: ${err.message}`, 'danger');
+        showToast(`Report error: ${err.message}`, 'danger');
       } finally {
-        el.btnModalCollect.disabled = false;
-        el.btnModalCollect.innerHTML = origText;
+        el.generateReportBtn.disabled = false;
+        el.generateReportBtn.innerHTML = originalText;
       }
+    });
+  }
+
+  if (el.downloadReportBtn) {
+    el.downloadReportBtn.addEventListener('click', () => {
+      if (!state.reportBlobUrl || !state.reportFilename) return;
+      const download = document.createElement('a');
+      download.href = state.reportBlobUrl;
+      download.download = state.reportFilename;
+      document.body.appendChild(download);
+      download.click();
+      download.remove();
     });
   }
 

@@ -25,6 +25,10 @@
         <i class="bi bi-plus-circle"></i>
         <span>Add Monitored Server</span>
       </a>
+      <a href="{% url 'admin:servers_server_changelist' %}" class="btn-hero btn-hero-glass" title="Manage registered Linux servers">
+        <i class="bi bi-sliders"></i>
+        <span>Manage Servers</span>
+      </a>
       <a href="{% url 'admin:servers_alert_changelist' %}?status__exact=ACTIVE" class="btn-hero btn-hero-glass" title="Inspect active incident alerts">
         <i class="bi bi-shield-exclamation"></i>
         <span>Active Incidents ({{ mon_stats.active_alerts }})</span>
@@ -35,7 +39,7 @@
   <!-- ================= 4 HERO KPI STAT CARDS ================= -->
   <div class="admin-hero-grid">
     <!-- Card 1: Monitored Servers -->
-    <div class="admin-kpi-card" style="--card-accent: #3b82f6; --card-glow: rgba(59, 130, 246, 0.2);">
+    <a href="{% url 'admin:servers_server_changelist' %}" class="admin-kpi-card admin-kpi-card-link" style="--card-accent: #3b82f6; --card-glow: rgba(59, 130, 246, 0.2);" title="View monitored servers">
       <div class="admin-kpi-header">
         <span class="admin-kpi-title">Monitored Fleet</span>
         <div class="admin-kpi-icon-wrapper" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
@@ -52,10 +56,10 @@
           <span class="badge-admin-status badge-admin-down ms-1"><span class="badge-dot badge-dot-down"></span> {{ mon_stats.offline_servers }} DOWN</span>
         {% endif %}
       </div>
-    </div>
+    </a>
 
     <!-- Card 2: Fleet Availability -->
-    <div class="admin-kpi-card" style="--card-accent: {% if mon_stats.offline_servers > 0 %}#f59e0b{% else %}#10b981{% endif %}; --card-glow: {% if mon_stats.offline_servers > 0 %}rgba(245, 158, 11, 0.2){% else %}rgba(16, 185, 129, 0.2){% endif %};">
+    <a href="{% url 'admin:servers_server_changelist' %}" class="admin-kpi-card admin-kpi-card-link" style="--card-accent: {% if mon_stats.offline_servers > 0 %}#f59e0b{% else %}#10b981{% endif %}; --card-glow: {% if mon_stats.offline_servers > 0 %}rgba(245, 158, 11, 0.2){% else %}rgba(16, 185, 129, 0.2){% endif %};" title="View server availability">
       <div class="admin-kpi-header">
         <span class="admin-kpi-title">Fleet Availability</span>
         <div class="admin-kpi-icon-wrapper" style="background: {% if mon_stats.offline_servers > 0 %}rgba(245, 158, 11, 0.15){% else %}rgba(16, 185, 129, 0.15){% endif %}; color: {% if mon_stats.offline_servers > 0 %}#fbbf24{% else %}#34d399{% endif %};">
@@ -73,10 +77,10 @@
           <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>All nodes healthy & responsive</span>
         {% endif %}
       </div>
-    </div>
+    </a>
 
     <!-- Card 3: Active Alerts -->
-    <div class="admin-kpi-card" style="--card-accent: {% if mon_stats.critical_alerts > 0 %}#ef4444{% elif mon_stats.active_alerts > 0 %}#f59e0b{% else %}#10b981{% endif %}; --card-glow: {% if mon_stats.critical_alerts > 0 %}rgba(239, 68, 68, 0.2){% else %}rgba(16, 185, 129, 0.2){% endif %};">
+    <a href="{% url 'admin:servers_alert_changelist' %}?status__exact=ACTIVE" class="admin-kpi-card admin-kpi-card-link" style="--card-accent: {% if mon_stats.critical_alerts > 0 %}#ef4444{% elif mon_stats.active_alerts > 0 %}#f59e0b{% else %}#10b981{% endif %}; --card-glow: {% if mon_stats.critical_alerts > 0 %}rgba(239, 68, 68, 0.2){% else %}rgba(16, 185, 129, 0.2){% endif %};" title="View active incidents">
       <div class="admin-kpi-header">
         <span class="admin-kpi-title">Active Incidents</span>
         <div class="admin-kpi-icon-wrapper" style="background: {% if mon_stats.critical_alerts > 0 %}rgba(239, 68, 68, 0.15){% elif mon_stats.active_alerts > 0 %}rgba(245, 158, 11, 0.15){% else %}rgba(16, 185, 129, 0.15){% endif %}; color: {% if mon_stats.critical_alerts > 0 %}#f87171{% elif mon_stats.active_alerts > 0 %}#fbbf24{% else %}#34d399{% endif %};">
@@ -96,10 +100,10 @@
           <span class="text-success"><i class="bi bi-shield-check me-1"></i>Zero active incidents</span>
         {% endif %}
       </div>
-    </div>
+    </a>
 
     <!-- Card 4: Telemetry Samples -->
-    <div class="admin-kpi-card" style="--card-accent: #06b6d4; --card-glow: rgba(6, 182, 212, 0.2);">
+    <a href="{% url 'admin:monitoring_metricsample_changelist' %}" class="admin-kpi-card admin-kpi-card-link" style="--card-accent: #06b6d4; --card-glow: rgba(6, 182, 212, 0.2);" title="View telemetry samples">
       <div class="admin-kpi-header">
         <span class="admin-kpi-title">Telemetry Pipeline</span>
         <div class="admin-kpi-icon-wrapper" style="background: rgba(6, 182, 212, 0.15); color: #38bdf8;">
@@ -113,7 +117,7 @@
       <div class="admin-kpi-subtext">
         <span class="text-info"><i class="bi bi-arrow-repeat me-1"></i>Captured SSH Metric Samples</span>
       </div>
-    </div>
+    </a>
   </div>
 
   <!-- ================= LIVE MONITORED SERVERS QUICK VIEW ================= -->
@@ -131,6 +135,10 @@
           <a href="{% url 'admin:servers_server_changelist' %}" class="btn-admin-preview-action">
             <span>Manage All Servers</span>
             <i class="bi bi-arrow-right"></i>
+          </a>
+          <a href="{% url 'admin:servers_server_add' %}" class="btn-admin-preview-action">
+            <i class="bi bi-plus-circle me-1"></i>
+            <span>Add Server</span>
           </a>
         </div>
       </div>
@@ -178,8 +186,8 @@
                   {{ s.last_check_at|date:"Y-m-d H:i:s"|default:"Pending check" }}
                 </td>
                 <td class="text-end">
-                  <a href="{% url 'admin:servers_server_change' s.pk %}" class="btn-table-action" title="View/Edit in Admin">
-                    <i class="bi bi-gear-fill me-1"></i>Configure
+                  <a href="{% url 'admin:servers_server_change' s.pk %}" class="btn-table-action" title="Edit server settings" aria-label="Edit server settings">
+                    <i class="bi bi-gear-fill"></i>
                   </a>
                 </td>
               </tr>
@@ -188,9 +196,24 @@
         </table>
       </div>
     </div>
+  {% else %}
+    <div class="admin-fleet-preview-card">
+      <div class="admin-fleet-preview-header">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-hdd-stack-fill text-primary fs-5"></i>
+          <div>
+            <h3 class="admin-fleet-preview-title">No monitored servers yet</h3>
+            <span class="admin-fleet-preview-subtitle">Register a server to begin collecting SSH telemetry.</span>
+          </div>
+        </div>
+        <a href="{% url 'admin:servers_server_add' %}" class="btn-admin-preview-action">
+          <i class="bi bi-plus-circle me-1"></i>
+          <span>Add Server</span>
+        </a>
+      </div>
+    </div>
   {% endif %}
 
-  <!-- ================= DJANGO APP MODULES & RECENT ACTIONS ================= -->
-  {{ block.super }}
-
 {% endblock %}
+
+{% block sidebar %}{% endblock %}
