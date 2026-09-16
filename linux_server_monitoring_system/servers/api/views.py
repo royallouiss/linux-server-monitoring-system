@@ -246,6 +246,23 @@ class ServerViewSet(ModelViewSet):
                     "last_error",
                 ],
             )
+            Alert.objects.filter(
+                server=server,
+                status=Alert.Status.ACTIVE,
+                title="SSH Connection Failed",
+            ).update(
+                status=Alert.Status.RESOLVED,
+                resolved_at=check_time,
+                is_read=True,
+            )
+            Alert.objects.create(
+                server=server,
+                title="SSH Connection Successful",
+                message=message or "SSH connection established successfully.",
+                severity=Alert.Severity.INFO,
+                status=Alert.Status.ACTIVE,
+                is_read=False,
+            )
             ssh.disconnect()
 
             return Response(
@@ -264,13 +281,13 @@ class ServerViewSet(ModelViewSet):
         server.last_error = message
         server.save(update_fields=["status", "last_check_at", "last_error"])
 
-        # Create active alert if one doesn't exist
-        Alert.objects.get_or_create(
+        Alert.objects.create(
             server=server,
-            status=Alert.Status.ACTIVE,
-            severity=Alert.Severity.CRITICAL,
             title="SSH Connection Failed",
-            defaults={"message": message},
+            message=message,
+            severity=Alert.Severity.CRITICAL,
+            status=Alert.Status.ACTIVE,
+            is_read=False,
         )
 
         return Response(
@@ -316,6 +333,10 @@ class ServerViewSet(ModelViewSet):
 
         now = timezone.now()
         ranges = {
+            "1d": timedelta(days=1),
+            "3d": timedelta(days=3),
+            "1w": timedelta(days=7),
+            "1m": timedelta(days=30),
             "1h": timedelta(hours=1),
             "6h": timedelta(hours=6),
             "24h": timedelta(hours=24),
@@ -429,6 +450,123 @@ class ServerViewSet(ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+<<<<<<< Updated upstream
+=======
+    @action(detail=False, methods=["get"], url_path="fleet-metrics")
+    def fleet_metrics(self, request):
+        """Return time-series averages across all registered servers."""
+        range_param = request.query_params.get("range", "24h").lower()
+        ranges = {
+            "1h": timedelta(hours=1),
+            "6h": timedelta(hours=6),
+            "24h": timedelta(hours=24),
+            "7d": timedelta(days=7),
+        }
+        since = timezone.now() - ranges.get(range_param, timedelta(hours=24))
+        samples = MetricSample.objects.filter(
+            timestamp__gte=since,
+        ).order_by("timestamp")
+        selected_server_ids = [
+            value
+            for value in request.query_params.get("server_ids", "").split(",")
+            if value.isdigit()
+        ]
+        if selected_server_ids:
+            samples = samples.filter(server_id__in=selected_server_ids)
+
+        grouped = {}
+        for sample in samples:
+            timestamp_group = grouped.setdefault(sample.timestamp, {})
+            server_metrics = timestamp_group.setdefault(sample.server_id, {})
+            server_metrics[sample.metric_name] = float(sample.value)
+
+        labels = []
+        series = {
+            "cpu": [],
+            "load_1m": [],
+            "memory": [],
+            "disk": [],
+            "network_rx": [],
+            "network_tx": [],
+        }
+        for timestamp, server_maps in grouped.items():
+            values = {key: [] for key in series}
+            for metrics in server_maps.values():
+                for key, metric_name in (
+                    ("cpu", "cpu_usage"),
+                    ("load_1m", "load_1m"),
+                    ("memory", "memory_usage"),
+                ):
+                    if metric_name in metrics:
+                        values[key].append(metrics[metric_name])
+
+                for key, prefix, divisor in (
+                    ("disk", "disk_usage:", 1),
+                    ("network_rx", "network_receive_rate:", 1024),
+                    ("network_tx", "network_transmit_rate:", 1024),
+                ):
+                    metric_value = next(
+                        (
+                            value / divisor
+                            for name, value in metrics.items()
+                            if name.startswith(prefix)
+                        ),
+                        None,
+                    )
+                    if metric_value is not None:
+                        values[key].append(metric_value)
+
+            labels.append(timestamp.isoformat())
+            for key, values_for_metric in values.items():
+                series[key].append(
+                    round(sum(values_for_metric) / len(values_for_metric), 2)
+                    if values_for_metric
+                    else 0.0
+                )
+
+        def latest_delta(values):
+            return round(values[-1] - values[-2], 2) if len(values) > 1 else 0.0
+
+        return Response(
+            {
+                "range": range_param,
+                "server_name": (
+                    f"{len(selected_server_ids)} selected server(s)"
+                    if selected_server_ids
+                    else "All registered servers"
+                ),
+                "labels": labels,
+                **series,
+                "deltas": {
+                    "cpu": latest_delta(series["cpu"]),
+                    "memory": latest_delta(series["memory"]),
+                    "disk": latest_delta(series["disk"]),
+                    "network_rx": latest_delta(series["network_rx"]),
+                    "network_tx": latest_delta(series["network_tx"]),
+                },
+                "interval_seconds": 30,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["get"], url_path=r"metrics/(?P<metric>[^/.]+)")
+    def metric(self, request, pk=None, metric=None):
+        """Returns raw serialized samples for a single metric name."""
+        server = self.get_object()
+        samples = MetricSample.objects.filter(
+            server=server,
+            metric_name=metric,
+        ).order_by("-timestamp")
+        return Response(
+            MetricSampleSerializer(
+                samples,
+                many=True,
+                context={"request": request},
+            ).data,
+            status=status.HTTP_200_OK,
+        )
+
+>>>>>>> Stashed changes
 
 
 class AlertViewSet(ModelViewSet):
@@ -439,6 +577,30 @@ class AlertViewSet(ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        for server in Server.objects.filter(status="DOWN"):
+            alert = (
+                Alert.objects.filter(
+                    server=server,
+                    status=Alert.Status.ACTIVE,
+                    severity=Alert.Severity.CRITICAL,
+                    title="SSH Connection Failed",
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            if alert is None:
+                Alert.objects.create(
+                    server=server,
+                    title="SSH Connection Failed",
+                    message=server.last_error or "Server is currently offline.",
+                    severity=Alert.Severity.CRITICAL,
+                    status=Alert.Status.ACTIVE,
+                    is_read=False,
+                )
+            elif alert.message != (server.last_error or "Server is currently offline."):
+                alert.message = server.last_error or "Server is currently offline."
+                alert.save(update_fields=["message"])
+
         queryset = super().get_queryset()
         status_param = self.request.query_params.get("status")
         severity_param = self.request.query_params.get("severity")
@@ -460,3 +622,11 @@ class AlertViewSet(ModelViewSet):
         alert.resolve()
         serializer = self.get_serializer(alert)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="mark-read")
+    def mark_read(self, request):
+        updated = self.get_queryset().filter(
+            status=Alert.Status.ACTIVE,
+            is_read=False,
+        ).update(is_read=True)
+        return Response({"updated": updated}, status=status.HTTP_200_OK)

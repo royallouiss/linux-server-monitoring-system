@@ -474,6 +474,19 @@ div.breadcrumbs {
   backdrop-filter: blur(12px);
 }
 
+.admin-kpi-card-link {
+  color: inherit;
+  text-decoration: none !important;
+  cursor: pointer;
+}
+
+.admin-kpi-card-link:hover,
+.admin-kpi-card-link:focus,
+.admin-kpi-card-link:focus-visible {
+  color: inherit;
+  text-decoration: none !important;
+}
+
 .admin-kpi-card:hover {
   transform: translateY(-3px);
   border-color: rgba(255, 255, 255, 0.18);

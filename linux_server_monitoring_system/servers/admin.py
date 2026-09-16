@@ -244,6 +244,9 @@ class AlertAdmin(admin.ModelAdmin):
 
     actions = ["mark_resolved", "mark_active"]
 
+    def has_add_permission(self, request):
+        return False
+
     @admin.display(description="Severity", ordering="severity")
     def severity_badge(self, obj):
         classes = {
