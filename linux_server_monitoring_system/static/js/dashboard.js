@@ -4,6 +4,8 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Only run on the dashboard page; this script is loaded site-wide via
+  // base.html, and its 403 redirect loop would otherwise hijack the login page.
   if (!document.getElementById('dashboard-app')) return;
 
   // Global Dashboard State
