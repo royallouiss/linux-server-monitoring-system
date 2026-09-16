@@ -132,6 +132,10 @@
             <span>Manage All Servers</span>
             <i class="bi bi-arrow-right"></i>
           </a>
+          <a href="{% url 'admin:servers_server_add' %}" class="btn-admin-preview-action">
+            <i class="bi bi-plus-circle me-1"></i>
+            <span>Add Server</span>
+          </a>
         </div>
       </div>
 
@@ -189,8 +193,5 @@
       </div>
     </div>
   {% endif %}
-
-  <!-- ================= DJANGO APP MODULES & RECENT ACTIONS ================= -->
-  {{ block.super }}
 
 {% endblock %}
